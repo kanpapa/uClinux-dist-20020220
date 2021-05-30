@@ -5,6 +5,6 @@
 * Host OS: ubuntu 16.04 LTS 32bit
 
 * Build options
-   - Vendor/Product: Lineo/uCdimm
+   - Vendor/Product: Lineo/uCsimm
    - Kernel Version: linux-2.4.x
    - Libc Version: uC-libc

@@ -1,0 +1,8 @@
+CONFIG_IP_NF_MATCH_TOS
+AH/ESP match support
+CONFIG_IP_NF_MATCH_AH_ESP
+  These two match extensions (`ah' and `esp') allow you to match a
+  range of SPIs inside AH or ESP headers of IPSec packets.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.

@@ -1,0 +1,12 @@
+#!/bin/sh -x
+
+BINDIR=/usr/local/sbin
+MANDIR=/usr/local/man/man1
+
+if [ ! -e dnsmasq ]; then
+  gcc dnsmasq.c -o dnsmasq
+fi
+
+install -d $BINDIR -d $MANDIR
+install -m 644 dnsmasq.1 $MANDIR 
+install -m 755 dnsmasq $BINDIR

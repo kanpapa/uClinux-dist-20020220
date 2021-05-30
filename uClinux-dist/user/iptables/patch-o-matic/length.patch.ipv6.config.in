@@ -1,0 +1,2 @@
+  dep_tristate '  netfilter MARK match support' CONFIG_IP6_NF_MATCH_MARK $CONFIG_IP6_NF_IPTABLES
+  dep_tristate '  Packet Length match support' CONFIG_IP6_NF_MATCH_LENGTH $CONFIG_IP6_NF_IPTABLES

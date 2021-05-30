@@ -1,0 +1,242 @@
+/*
+ * Automatically generated C config: don't edit
+ */
+#define AUTOCONF_INCLUDED
+#define CONFIG_UCLINUX 1
+
+/*
+ * Code maturity level options
+ */
+#define CONFIG_EXPERIMENTAL 1
+
+/*
+ * Loadable module support
+ */
+#undef  CONFIG_MODULES
+
+/*
+ * Platform dependant setup
+ */
+#undef  CONFIG_M68000
+#undef  CONFIG_M68EN302
+#undef  CONFIG_M68328
+#undef  CONFIG_M68EZ328
+#undef  CONFIG_M68332
+#undef  CONFIG_M68360
+#undef  CONFIG_M5204
+#undef  CONFIG_M5206
+#undef  CONFIG_M5206e
+#undef  CONFIG_M5272
+#define CONFIG_M5307 1
+#undef  CONFIG_M5407
+
+/*
+ * Platform
+ */
+#define CONFIG_COLDFIRE 1
+#undef  CONFIG_ARNEWSH
+#define CONFIG_NETtel 1
+#undef  CONFIG_eLIA
+#undef  CONFIG_DISKtel
+#undef  CONFIG_SNAPGEAR
+#undef  CONFIG_SECUREEDGEMP3
+#undef  CONFIG_CADRE3
+#undef  CONFIG_CLEOPATRA
+#define CONFIG_OLDMASK 1
+#undef  CONFIG_CLOCK_AUTO
+#undef  CONFIG_CLOCK_16MHz
+#undef  CONFIG_CLOCK_20MHz
+#undef  CONFIG_CLOCK_25MHz
+#undef  CONFIG_CLOCK_33MHz
+#undef  CONFIG_CLOCK_40MHz
+#define CONFIG_CLOCK_45MHz 1
+#undef  CONFIG_CLOCK_50MHz
+#undef  CONFIG_CLOCK_54MHz
+#undef  CONFIG_CLOCK_60MHz
+#undef  CONFIG_CLOCK_66MHz
+#undef  CONFIG_RAMAUTO
+#define CONFIG_RAM4MB 1
+#undef  CONFIG_RAM8MB
+#undef  CONFIG_RAM16MB
+#undef  CONFIG_RAM32MB
+#define CONFIG_AUTOBIT 1
+#undef  CONFIG_RAM8BIT
+#undef  CONFIG_RAM16BIT
+#undef  CONFIG_RAM32bit
+#undef  CONFIG_NOFLASH
+#define CONFIG_AMDFLASH 1
+#undef  CONFIG_INTELFLASH
+#undef  CONFIG_FLASHAUTO
+#undef  CONFIG_FLASH128KB
+#define CONFIG_FLASH1MB 1
+#undef  CONFIG_FLASH2MB
+#undef  CONFIG_FLASH4MB
+#undef  CONFIG_FLASH6MB
+#undef  CONFIG_FLASH8MB
+#undef  CONFIG_FLASH16MB
+#undef  CONFIG_FLASHAUTOBIT
+#undef  CONFIG_FLASH8BIT
+#define CONFIG_FLASH16BIT 1
+#undef  CONFIG_FLASH32bit
+#undef  CONFIG_EXTRA_FLASH1MB
+#define CONFIG_RAMKERNEL 1
+#undef  CONFIG_ROMKERNEL
+
+/*
+ * General setup
+ */
+#undef  CONFIG_PCI
+#define CONFIG_NET 1
+#undef  CONFIG_SYSVIPC
+#define CONFIG_REDUCED_MEMORY 1
+#define CONFIG_BINFMT_FLAT 1
+#undef  CONFIG_BINFMT_ZFLAT
+#define CONFIG_KERNEL_ELF 1
+#undef  CONFIG_CONSOLE
+
+/*
+ * Floppy, IDE, and other block devices
+ */
+#define CONFIG_BLK_DEV_BLKMEM 1
+#define CONFIG_FLASH_SNAPGEAR 1
+#undef  CONFIG_BLK_DEV_IDE
+
+/*
+ * Additional Block/FLASH Devices
+ */
+#undef  CONFIG_BLK_DEV_LOOP
+#undef  CONFIG_BLK_DEV_MD
+#define CONFIG_BLK_DEV_RAM 1
+#undef  CONFIG_RD_RELEASE_BLOCKS
+#undef  CONFIG_DEV_FLASH
+#undef  CONFIG_BLK_DEV_NFA
+
+/*
+ * Networking options
+ */
+#define CONFIG_FIREWALL 1
+#define CONFIG_NET_ALIAS 1
+#define CONFIG_INET 1
+#define CONFIG_IP_FORWARD 1
+#undef  CONFIG_IP_MULTICAST
+#undef  CONFIG_SYN_COOKIES
+#define CONFIG_IP_FIREWALL 1
+#undef  CONFIG_IP_FIREWALL_VERBOSE
+#define CONFIG_IP_MASQUERADE 1
+
+/*
+ * Protocol-specific masquerading support will be built as modules.
+ */
+#undef  CONFIG_IP_MASQUERADE_IPAUTOFW
+#undef  CONFIG_IP_MASQUERADE_IPPORTFW
+#define CONFIG_IP_MASQUERADE_PPTP 1
+#define CONFIG_IP_MASQUERADE_PPTP_MULTICLIENT 1
+#undef  DEBUG_IP_MASQUERADE_PPTP
+#define CONFIG_IP_MASQUERADE_IPSEC 1
+#define CONFIG_IP_MASQUERADE_IPSEC_EXPIRE (30)
+#undef  CONFIG_IP_MASQUERADE_IPSEC_NOGUESS
+#undef  DEBUG_IP_MASQUERADE_IPSEC
+#define CONFIG_IP_MASQUERADE_ICMP 1
+#undef  CONFIG_IP_TRANSPARENT_PROXY
+#define CONFIG_IP_ALWAYS_DEFRAG 1
+#undef  CONFIG_IP_ACCT
+#define CONFIG_IP_ROUTER 1
+#undef  CONFIG_NET_IPIP
+#define CONFIG_IP_ALIAS 1
+
+/*
+ * (it is safe to leave these untouched)
+ */
+#undef  CONFIG_INET_PCTCP
+#undef  CONFIG_INET_RARP
+#undef  CONFIG_NO_PATH_MTU_DISCOVERY
+#undef  CONFIG_IP_NOSR
+#undef  CONFIG_SKB_LARGE
+
+/*
+ *  
+ */
+#undef  CONFIG_IPX
+#undef  CONFIG_ATALK
+#undef  CONFIG_AX25
+#undef  CONFIG_BRIDGE
+#undef  CONFIG_NETLINK
+#undef  CONFIG_IPSEC
+
+/*
+ * Network device support
+ */
+#define CONFIG_NETDEVICES 1
+#undef  CONFIG_DUMMY
+#define CONFIG_SLIP 1
+#define CONFIG_SLIP_COMPRESSED 1
+#undef  CONFIG_SLIP_SMART
+#undef  CONFIG_SLIP_MODE_SLIP6
+#define CONFIG_PPP 1
+
+/*
+ * CCP compressors for PPP are only built as modules.
+ */
+#undef  CONFIG_EQUALIZER
+#undef  CONFIG_UCCS8900
+#define CONFIG_SMC9194 1
+#undef  CONFIG_SMC91111
+#undef  CONFIG_NE2000
+#undef  CONFIG_FEC
+
+/*
+ * Filesystems
+ */
+#undef  CONFIG_QUOTA
+#undef  CONFIG_MINIX_FS
+#undef  CONFIG_EXT_FS
+#define CONFIG_EXT2_FS 1
+#undef  CONFIG_XIA_FS
+#undef  CONFIG_NLS
+#define CONFIG_PROC_FS 1
+#undef  CONFIG_NFS_FS
+#undef  CONFIG_SMB_FS
+#undef  CONFIG_HPFS_FS
+#undef  CONFIG_SYSV_FS
+#undef  CONFIG_AUTOFS_FS
+#undef  CONFIG_AFFS_FS
+#define CONFIG_ROMFS_FS 1
+#undef  CONFIG_JFFS_FS
+#undef  CONFIG_UFS_FS
+
+/*
+ * Character devices
+ */
+#define CONFIG_COLDFIRE_SERIAL 1
+#undef  CONFIG_SERIAL
+#undef  CONFIG_MCF_MBUS
+#undef  CONFIG_LCDTXT
+#undef  CONFIG_KEYPAD
+#undef  CONFIG_KEY
+#undef  CONFIG_LCDDMA
+#undef  CONFIG_DAC0800
+#undef  CONFIG_DACI2S
+#undef  CONFIG_T6963
+#define CONFIG_LEDMAN 1
+#undef  CONFIG_LIRC_INTR
+#undef  CONFIG_IDETEST
+#define CONFIG_RESETSWITCH 1
+#undef  CONFIG_DS1302
+#undef  CONFIG_EXP
+#undef  CONFIG_WATCHDOG
+
+/*
+ * Sound support
+ */
+#undef  CONFIG_AD1845
+
+/*
+ * Kernel hacking
+ */
+#undef  CONFIG_FULLDEBUG
+#define CONFIG_ALLOC2 1
+#undef  CONFIG_PROFILE
+#undef  CONFIG_MAGIC_SYSRQ
+#undef  CONFIG_DUMPTOFLASH
+#undef  CONFIG_MEMORY_PROTECT
+#undef  CONFIG_BDM_DISABLE

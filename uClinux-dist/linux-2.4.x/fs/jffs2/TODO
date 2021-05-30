@@ -1,0 +1,36 @@
+$Id: TODO,v 1.4 2002/01/24 01:41:05 dwmw2 Exp $
+
+ - Locking audit.
+ - Fix i_nlink on directories. We must be able to count the number of DT_DIR children
+	and add that to inode->i_nlink. In the meantime, apps tend to take the current
+	value (of 1) as "don't know", and DTRT. 
+ - disable compression in commit_write()?
+ - fix zlib. It's ugly as hell and there are at least three copies in the kernel tree
+ - fine-tune the allocation / GC thresholds
+ - chattr support - turning on/off and tuning compression per-inode
+ - checkpointing (do we need this? scan is quite fast)
+ - make the scan code populate real inodes so read_inode just after 
+	mount doesn't have to read the flash twice for large files.
+	Make this a per-inode option, changable with chattr, so you can
+	decide which inodes should be in-core immediately after mount.
+ - stop it depending on a block device. mount(8) needs a change for this.
+ - test, test, test
+
+ - NAND flash support:
+    - Fix locking in jffs2_garbage_collect_deletion_dirent().
+    - Move CLEANMARKER into the 'spare' area.
+    - Write batching - build up a NAND-page worth of data and write out all in
+	one go, using the hardware ECC or block-based software ECC. This gives us
+	some interesting problems, but it's not that bad:
+	- When we go to erase a block from which we've been garbage-collecting,
+	  we have to make sure that the nodes in it _really_ are obsolete, and
+	  the new node which finally obsoletes the block we want to erase isn't
+	  still waiting in the write-buffer. We can do this by sticking such
+	  blocks not on the erase_pending_list, but on a new erase_pending_wbuf
+	  list, and then moving them to the erase_pending_list when the buffer is
+	  flushed.
+        - fsync() becomes a non-NOP.
+	- Deal with write errors. Data don't get lost - we just have to write 
+	  the affected node(s) out again somewhere else.
+
+

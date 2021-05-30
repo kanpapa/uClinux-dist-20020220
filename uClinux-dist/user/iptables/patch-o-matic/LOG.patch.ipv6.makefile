@@ -1,0 +1,2 @@
+obj-$(CONFIG_IP6_NF_TARGET_MARK) += ip6t_MARK.o
+obj-$(CONFIG_IP6_NF_TARGET_LOG) += ip6t_LOG.o

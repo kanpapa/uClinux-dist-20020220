@@ -1,0 +1,8 @@
+Author: Harald Welte <laforge@gnumonks.org>
+Status: Quite stable, as I didn't receive a single bug report for months
+
+This adds CONFIG_IP_NF_TARGET_ULOG option, which supplies a more
+advanced packet logging mechanism than the standard LOG target.  The
+libiptulog/ directory contains a library for receiving the ULOG
+messages.
+See http://www.gnumonks.org/projects/ulogd for more information

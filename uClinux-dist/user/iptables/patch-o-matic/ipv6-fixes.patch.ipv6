@@ -1,0 +1,382 @@
+diff -Nru linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6t_MARK.c linux-2.4.0-test8-ipv6mangle/net/ipv6/netfilter/ip6t_MARK.c
+--- linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6t_MARK.c	Mon May 22 18:50:55 2000
++++ linux-2.4.0-test8-ipv6mangle/net/ipv6/netfilter/ip6t_MARK.c	Fri Nov 10 17:41:31 2000
+@@ -4,8 +4,8 @@
+ #include <linux/ip.h>
+ #include <net/checksum.h>
+ 
+-#include <linux/netfilter_ipv4/ip_tables.h>
+-#include <linux/netfilter_ipv4/ipt_MARK.h>
++#include <linux/netfilter_ipv6/ip6_tables.h>
++#include <linux/netfilter_ipv6/ip6t_MARK.h>
+ 
+ static unsigned int
+ target(struct sk_buff **pskb,
+@@ -15,26 +15,26 @@
+        const void *targinfo,
+        void *userinfo)
+ {
+-	const struct ipt_mark_target_info *markinfo = targinfo;
++	const struct ip6t_mark_target_info *markinfo = targinfo;
+ 
+ 	if((*pskb)->nfmark != markinfo->mark) {
+ 		(*pskb)->nfmark = markinfo->mark;
+ 		(*pskb)->nfcache |= NFC_ALTERED;
+ 	}
+-	return IPT_CONTINUE;
++	return IP6T_CONTINUE;
+ }
+ 
+ static int
+ checkentry(const char *tablename,
+-	   const struct ipt_entry *e,
++	   const struct ip6t_entry *e,
+            void *targinfo,
+            unsigned int targinfosize,
+            unsigned int hook_mask)
+ {
+-	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_mark_target_info))) {
++	if (targinfosize != IP6T_ALIGN(sizeof(struct ip6t_mark_target_info))) {
+ 		printk(KERN_WARNING "MARK: targinfosize %u != %Zu\n",
+ 		       targinfosize,
+-		       IPT_ALIGN(sizeof(struct ipt_mark_target_info)));
++		       IP6T_ALIGN(sizeof(struct ip6t_mark_target_info)));
+ 		return 0;
+ 	}
+ 
+@@ -46,12 +46,13 @@
+ 	return 1;
+ }
+ 
+-static struct ipt_target ipt_mark_reg
++static struct ip6t_target ip6t_mark_reg
+ = { { NULL, NULL }, "MARK", target, checkentry, NULL, THIS_MODULE };
+ 
+ static int __init init(void)
+ {
+-	if (ipt_register_target(&ipt_mark_reg))
++	printk(KERN_DEBUG "registering ipv6 mark target\n");
++	if (ip6t_register_target(&ip6t_mark_reg))
+ 		return -EINVAL;
+ 
+ 	return 0;
+@@ -59,7 +60,7 @@
+ 
+ static void __exit fini(void)
+ {
+-	ipt_unregister_target(&ipt_mark_reg);
++	ip6t_unregister_target(&ip6t_mark_reg);
+ }
+ 
+ module_init(init);
+diff -Nru linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6t_mark.c linux-2.4.0-test8-ipv6mangle/net/ipv6/netfilter/ip6t_mark.c
+--- linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6t_mark.c	Mon May 22 18:50:55 2000
++++ linux-2.4.0-test8-ipv6mangle/net/ipv6/netfilter/ip6t_mark.c	Fri Nov 10 17:42:20 2000
+@@ -2,7 +2,7 @@
+ #include <linux/module.h>
+ #include <linux/skbuff.h>
+ 
+-#include <linux/netfilter_ipv4/ipt_mark.h>
++#include <linux/netfilter_ipv6/ip6t_mark.h>
+ #include <linux/netfilter_ipv6/ip6_tables.h>
+ 
+ static int
+@@ -15,7 +15,7 @@
+       u_int16_t datalen,
+       int *hotdrop)
+ {
+-	const struct ipt_mark_info *info = matchinfo;
++	const struct ip6t_mark_info *info = matchinfo;
+ 
+ 	return ((skb->nfmark & info->mask) == info->mark) ^ info->invert;
+ }
+@@ -27,7 +27,7 @@
+            unsigned int matchsize,
+            unsigned int hook_mask)
+ {
+-	if (matchsize != IP6T_ALIGN(sizeof(struct ipt_mark_info)))
++	if (matchsize != IP6T_ALIGN(sizeof(struct ip6t_mark_info)))
+ 		return 0;
+ 
+ 	return 1;
+diff -Nru linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6table_mangle.c linux-2.4.0-test8-ipv6mangle/net/ipv6/netfilter/ip6table_mangle.c
+--- linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6table_mangle.c	Thu Jan  1 01:00:00 1970
++++ linux-2.4.0-test8-ipv6mangle/net/ipv6/netfilter/ip6table_mangle.c	Sat Nov 11 02:13:28 2000
+@@ -0,0 +1,189 @@
++/*
++ * IPv6 packet mangling table, a port of the IPv4 mangle table to IPv6
++ *
++ * Copyright (C) 2000 by Harald Welte <laforge@gnumonks.org>
++ */
++#include <linux/module.h>
++#include <linux/netfilter_ipv6/ip6_tables.h>
++
++#define MANGLE_VALID_HOOKS ((1 << NF_IP6_PRE_ROUTING) | (1 << NF_IP6_LOCAL_OUT))
++
++#if 1
++#define DEBUGP(x, args...)	printk(KERN_DEBUG x, ## args)
++#else
++#define DEBUGP(x, args...)
++#endif
++
++/* Standard entry. */
++struct ip6t_standard
++{
++	struct ip6t_entry entry;
++	struct ip6t_standard_target target;
++};
++
++struct ip6t_error_target
++{
++	struct ip6t_entry_target target;
++	char errorname[IP6T_FUNCTION_MAXNAMELEN];
++};
++
++struct ip6t_error
++{
++	struct ip6t_entry entry;
++	struct ip6t_error_target target;
++};
++
++static struct
++{
++	struct ip6t_replace repl;
++	struct ip6t_standard entries[2];
++	struct ip6t_error term;
++} initial_table __initdata
++= { { "mangle", MANGLE_VALID_HOOKS, 3,
++      sizeof(struct ip6t_standard) * 2 + sizeof(struct ip6t_error),
++      { [NF_IP6_PRE_ROUTING] 0,
++	[NF_IP6_LOCAL_OUT] sizeof(struct ip6t_standard) },
++      { [NF_IP6_PRE_ROUTING] 0,
++	[NF_IP6_LOCAL_OUT] sizeof(struct ip6t_standard) },
++      0, NULL, { } },
++    {
++	    /* PRE_ROUTING */
++	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
++		0,
++		sizeof(struct ip6t_entry),
++		sizeof(struct ip6t_standard),
++		0, { 0, 0 }, { } },
++	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
++		-NF_ACCEPT - 1 } },
++	    /* LOCAL_OUT */
++	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
++		0,
++		sizeof(struct ip6t_entry),
++		sizeof(struct ip6t_standard),
++		0, { 0, 0 }, { } },
++	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
++		-NF_ACCEPT - 1 } }
++    },
++    /* ERROR */
++    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
++	0,
++	sizeof(struct ip6t_entry),
++	sizeof(struct ip6t_error),
++	0, { 0, 0 }, { } },
++      { { { { IP6T_ALIGN(sizeof(struct ip6t_error_target)), IP6T_ERROR_TARGET } },
++	  { } },
++	"ERROR"
++      }
++    }
++};
++
++static struct ip6t_table packet_mangler
++= { { NULL, NULL }, "mangle", &initial_table.repl,
++    MANGLE_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL };
++
++/* The work comes in here from netfilter.c. */
++static unsigned int
++ip6t_hook(unsigned int hook,
++	 struct sk_buff **pskb,
++	 const struct net_device *in,
++	 const struct net_device *out,
++	 int (*okfn)(struct sk_buff *))
++{
++	return ip6t_do_table(pskb, hook, in, out, &packet_mangler, NULL);
++}
++
++static unsigned int
++ip6t_local_out_hook(unsigned int hook,
++		   struct sk_buff **pskb,
++		   const struct net_device *in,
++		   const struct net_device *out,
++		   int (*okfn)(struct sk_buff *))
++{
++
++	unsigned long nfmark;
++	unsigned int ret;
++	struct in6_addr saddr, daddr;
++	u_int8_t hop_limit;
++	u_int32_t flowlabel;
++
++#if 0
++	/* root is playing with raw sockets. */
++	if ((*pskb)->len < sizeof(struct iphdr)
++	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr)) {
++		if (net_ratelimit())
++			printk("ip6t_hook: happy cracking.\n");
++		return NF_ACCEPT;
++	}
++#endif
++
++	/* save source/dest address, nfmark, hoplimit, flowlabel, priority,  */
++	memcpy(&saddr, &(*pskb)->nh.ipv6h->saddr, sizeof(saddr));
++	memcpy(&daddr, &(*pskb)->nh.ipv6h->daddr, sizeof(daddr));
++	nfmark = (*pskb)->nfmark;
++	hop_limit = (*pskb)->nh.ipv6h->hop_limit;
++
++	/* flowlabel and prio (includes version, which shouldn't change either */
++	flowlabel = (u_int32_t) (*pskb)->nh.ipv6h;
++
++	ret = ip6t_do_table(pskb, hook, in, out, &packet_mangler, NULL);
++
++	if (ret != NF_DROP && ret != NF_STOLEN 
++		&& (memcmp(&(*pskb)->nh.ipv6h->saddr, &saddr, sizeof(saddr))
++		    || memcmp(&(*pskb)->nh.ipv6h->daddr, &daddr, sizeof(daddr))
++		    || (*pskb)->nfmark != nfmark
++		    || (*pskb)->nh.ipv6h->hop_limit != hop_limit)) {
++
++		/* something which could affect routing has changed */
++
++		DEBUGP("ip6table_mangle: we'd need to re-route a packet\n");
++	}
++
++	return ret;
++}
++
++static struct nf_hook_ops ip6t_ops[]
++= { { { NULL, NULL }, ip6t_hook, PF_INET6, NF_IP6_PRE_ROUTING, NF_IP6_PRI_MANGLE },
++    { { NULL, NULL }, ip6t_local_out_hook, PF_INET6, NF_IP6_LOCAL_OUT,
++		NF_IP6_PRI_MANGLE }
++};
++
++static int __init init(void)
++{
++	int ret;
++
++	/* Register table */
++	ret = ip6t_register_table(&packet_mangler);
++	if (ret < 0)
++		return ret;
++
++	/* Register hooks */
++	ret = nf_register_hook(&ip6t_ops[0]);
++	if (ret < 0)
++		goto cleanup_table;
++
++	ret = nf_register_hook(&ip6t_ops[1]);
++	if (ret < 0)
++		goto cleanup_hook0;
++
++	return ret;
++
++ cleanup_hook0:
++	nf_unregister_hook(&ip6t_ops[0]);
++ cleanup_table:
++	ip6t_unregister_table(&packet_mangler);
++
++	return ret;
++}
++
++static void __exit fini(void)
++{
++	unsigned int i;
++
++	for (i = 0; i < sizeof(ip6t_ops)/sizeof(struct nf_hook_ops); i++)
++		nf_unregister_hook(&ip6t_ops[i]);
++
++	ip6t_unregister_table(&packet_mangler);
++}
++
++module_init(init);
++module_exit(fini);
+diff -Nru linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6_tables.c linux-2.4.0-test8-icmp6/net/ipv6/netfilter/ip6_tables.c
+--- linux-2.4.0-test8-plain/net/ipv6/netfilter/ip6_tables.c	Sat Aug  5 03:18:49 2000
++++ linux-2.4.0-test8-icmp6/net/ipv6/netfilter/ip6_tables.c	Sun Nov 12 12:43:36 2000
+@@ -11,7 +11,7 @@
+ #include <linux/module.h>
+ #include <linux/tcp.h>
+ #include <linux/udp.h>
+-#include <linux/icmp.h>
++#include <linux/icmpv6.h>
+ #include <net/ip.h>
+ #include <asm/uaccess.h>
+ #include <asm/semaphore.h>
+@@ -1642,7 +1642,7 @@
+ 
+ /* Returns 1 if the type and code is matched by the range, 0 otherwise */
+ static inline int
+-icmp_type_code_match(u_int8_t test_type, u_int8_t min_code, u_int8_t max_code,
++icmp6_type_code_match(u_int8_t test_type, u_int8_t min_code, u_int8_t max_code,
+ 		     u_int8_t type, u_int8_t code,
+ 		     int invert)
+ {
+@@ -1651,7 +1651,7 @@
+ }
+ 
+ static int
+-icmp_match(const struct sk_buff *skb,
++icmp6_match(const struct sk_buff *skb,
+ 	   const struct net_device *in,
+ 	   const struct net_device *out,
+ 	   const void *matchinfo,
+@@ -1660,7 +1660,7 @@
+ 	   u_int16_t datalen,
+ 	   int *hotdrop)
+ {
+-	const struct icmphdr *icmp = hdr;
++	const struct icmp6hdr *icmp = hdr;
+ 	const struct ip6t_icmp *icmpinfo = matchinfo;
+ 
+ 	if (offset == 0 && datalen < 2) {
+@@ -1673,16 +1673,16 @@
+ 
+ 	/* Must not be a fragment. */
+ 	return !offset
+-		&& icmp_type_code_match(icmpinfo->type,
++		&& icmp6_type_code_match(icmpinfo->type,
+ 					icmpinfo->code[0],
+ 					icmpinfo->code[1],
+-					icmp->type, icmp->code,
++					icmp->icmp6_type, icmp->icmp6_code,
+ 					!!(icmpinfo->invflags&IP6T_ICMP_INV));
+ }
+ 
+ /* Called when user tries to insert an entry of this type. */
+ static int
+-icmp_checkentry(const char *tablename,
++icmp6_checkentry(const char *tablename,
+ 	   const struct ip6t_ip6 *ipv6,
+ 	   void *matchinfo,
+ 	   unsigned int matchsize,
+@@ -1691,7 +1691,7 @@
+ 	const struct ip6t_icmp *icmpinfo = matchinfo;
+ 
+ 	/* Must specify proto == ICMP, and no unknown invflags */
+-	return ipv6->proto == IPPROTO_ICMP
++	return ipv6->proto == IPPROTO_ICMPV6
+ 		&& !(ipv6->invflags & IP6T_INV_PROTO)
+ 		&& matchsize == IP6T_ALIGN(sizeof(struct ip6t_icmp))
+ 		&& !(icmpinfo->invflags & ~IP6T_ICMP_INV);
+@@ -1711,8 +1711,8 @@
+ = { { NULL, NULL }, "tcp", &tcp_match, &tcp_checkentry, NULL };
+ static struct ip6t_match udp_matchstruct
+ = { { NULL, NULL }, "udp", &udp_match, &udp_checkentry, NULL };
+-static struct ip6t_match icmp_matchstruct
+-= { { NULL, NULL }, "icmp", &icmp_match, &icmp_checkentry, NULL };
++static struct ip6t_match icmp6_matchstruct
++= { { NULL, NULL }, "icmp6", &icmp6_match, &icmp6_checkentry, NULL };
+ 
+ #ifdef CONFIG_PROC_FS
+ static inline int print_name(const struct ip6t_table *t,
+@@ -1761,7 +1761,7 @@
+ 	list_append(&ip6t_target, &ip6t_error_target);
+ 	list_append(&ip6t_match, &tcp_matchstruct);
+ 	list_append(&ip6t_match, &udp_matchstruct);
+-	list_append(&ip6t_match, &icmp_matchstruct);
++	list_append(&ip6t_match, &icmp6_matchstruct);
+ 	up(&ip6t_mutex);
+ 
+ 	/* Register setsockopt */

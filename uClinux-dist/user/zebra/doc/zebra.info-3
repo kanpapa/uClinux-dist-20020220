@@ -1,0 +1,602 @@
+This is zebra.info, produced by makeinfo version 4.0 from zebra.texi.
+
+INFO-DIR-SECTION Routing Software
+START-INFO-DIR-ENTRY
+* Zebra: (zebra).		The GNU Zebra routing software.
+END-INFO-DIR-ENTRY
+
+   This file documents the GNU Zebra software which manages common
+TCP/IP routing protocols.
+
+   This is Edition 0.1, last updated 3 January 2000 of `The GNU Zebra
+Manual', for Zebra Version 0.85.
+
+   Copyright (C) 1999, 2000 Kunihiro Ishiguro
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided that the
+entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by Kunihiro Ishiguro.
+
+
+File: zebra.info,  Node: Packet Binary Dump Format,  Next: Command Index,  Prev: Zebra Protocol,  Up: Top
+
+Packet Binary Dump Format
+*************************
+
+   Zebra can dump routing protocol packet into file with binary format
+(*note Dump BGP packet and table::).
+
+   It seems to be better that we share the MRT's header format for
+backward compatibility of the MRT's dump logs. We should also define the
+binary format excluding the header, because we must support both of IP
+v4/v6 addresses as socket addresses and / or routing entries.
+
+   In the last meeting, we discussed to have a version field in the
+header. But, Masaki told us that we can define new `type' value rather
+than having a `version' field, and it seems to be better because we
+don't need to change header format.
+
+   Here is the common header format. This is same as that of MRT.
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                              Time                             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |             Type              |            Subtype            |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                             Length                            |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   If `type' is PROTOCOL_BGP4MP, `subtype' is BGP4MP_STATE_CHANGE, and
+Address Family == IP (version 4)
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Source AS number       |     Destination AS number     |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Interface Index        |      Address Family           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address                      |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address                    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |            Old State          |           New State           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   Where State is the value defined in RFC1771.
+
+   If `type' is PROTOCOL_BGP4MP, `subtype' is BGP4MP_STATE_CHANGE, and
+Address Family == IP version 6
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Source AS number       |     Destination AS number     |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Interface Index        |      Address Family           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address                      |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address (Cont'd)             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address (Cont'd)             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address (Cont'd)             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address                    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address (Cont'd)           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address (Cont'd)           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address (Cont'd)           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |            Old State          |           New State           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   If `type' is PROTOCOL_BGP4MP, `subtype' is BGP4MP_MESSAGE, and
+Address Family == IP (version 4)
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Source AS number       |     Destination AS number     |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Interface Index        |      Address Family           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address                      |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address                    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                       BGP Message Packet                      |
+     |                                                               |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   Where BGP Message Packet is the whole contents of the BGP4 message
+including header portion.
+
+   If `type' is PROTOCOL_BGP4MP, `subtype' is BGP4MP_MESSAGE, and
+Address Family == IP version 6
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Source AS number       |     Destination AS number     |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |        Interface Index        |      Address Family           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address                      |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address (Cont'd)             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address (Cont'd)             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Source IP address (Cont'd)             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address                    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address (Cont'd)           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address (Cont'd)           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                     Destination IP address (Cont'd)           |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                       BGP Message Packet                      |
+     |                                                               |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   If `type' is PROTOCOL_BGP4MP, `subtype' is BGP4MP_ENTRY, and Address
+Family == IP (version 4)
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |            View #             |            Status             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Time Last Change                       |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |       Address Family          |    SAFI       | Next-Hop-Len  |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Next Hop Address                       |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     | Prefix Length |             Address Prefix [variable]         |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |       Attribute Length        |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |      BGP Attribute [variable length]    			    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   If `type' is PROTOCOL_BGP4MP, `subtype' is BGP4MP_ENTRY, and Address
+Family == IP version 6
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |            View #             |            Status             |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Time Last Change                       |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |       Address Family          |    SAFI       | Next-Hop-Len  |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Next Hop Address                       |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Next Hop Address (Cont'd)              |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Next Hop Address (Cont'd)              |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                        Next Hop Address (Cont'd)              |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     | Prefix Length |             Address Prefix [variable]         |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |     Address Prefix (cont'd) [variable]        |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |       Attribute Length        |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |      BGP Attribute [variable length]    			    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   	BGP4 Attribute must not contains MP_UNREACH_NLRI.  	If BGP Attribute
+has MP_REACH_NLRI field, it must has 	zero length NLRI, e.g.,
+MP_REACH_NLRI has only Address 	Family, SAFI and next-hop values.
+
+   If `type' is PROTOCOL_BGP4MP and `subtype' is BGP4MP_SNAPSHOT,
+
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |           View #              |       File Name [variable]    |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The file specified in "File Name" contains all routing entries,
+which are in the format of "subtype == BGP4MP_ENTRY".
+
+     Constants:
+       /* type value */
+       #define MSG_PROTOCOL_BGP4MP 16
+       /* subtype value */
+       #define BGP4MP_STATE_CHANGE 0
+       #define BGP4MP_MESSAGE 1
+       #define BGP4MP_ENTRY 2
+       #define BGP4MP_SNAPSHOT 3
+
+
+File: zebra.info,  Node: Command Index,  Next: VTY Key Index,  Prev: Packet Binary Dump Format,  Up: Top
+
+Command Index
+*************
+
+* Menu:
+
+* access-class ACCESS-LIST:              Basic Config Commands.
+* access-list NAME deny IPV4-NETWORK:    IP Access List.
+* access-list NAME permit IPV4-NETWORK:  IP Access List.
+* aggregate-address NETWORK:             BGP network.
+* area <0-4294967295> authentication:    OSPF area.
+* area <0-4294967295> authentication message-digest: OSPF area.
+* area <0-4294967295> export-list NAME:  OSPF area.
+* area <0-4294967295> import-list NAME:  OSPF area.
+* area <0-4294967295> range A.B.C.D/M:   OSPF area.
+* area <0-4294967295> shortcut:          OSPF area.
+* area <0-4294967295> stub:              OSPF area.
+* area <0-4294967295> stub no-summary:   OSPF area.
+* area <0-4294967295> virtual-link A.B.C.D: OSPF area.
+* area A.B.C.D authentication:           OSPF area.
+* area A.B.C.D authentication message-digest: OSPF area.
+* area A.B.C.D default-cost <0-16777215>: OSPF area.
+* area A.B.C.D export-list NAME:         OSPF area.
+* area A.B.C.D import-list NAME:         OSPF area.
+* area A.B.C.D range A.B.C.D/M:          OSPF area.
+* area A.B.C.D range IPV4_PREFIX substitute IPV4_PREFIX: OSPF area.
+* area A.B.C.D range IPV4_PREFIX suppress: OSPF area.
+* area A.B.C.D shortcut:                 OSPF area.
+* area A.B.C.D stub:                     OSPF area.
+* area A.B.C.D stub no-summary:          OSPF area.
+* area A.B.C.D virtual-link A.B.C.D:     OSPF area.
+* banner motd default:                   Basic Config Commands.
+* bgp cluster-id A.B.C.D:                Route Reflector.
+* bgp multiple-instance:                 Multiple instance.
+* bgp router-id ROUTER-ID:               BGP router.
+* clear ip bgp PEER:                     BGP terminal mode commands.
+* clear ip prefix-list:                  Clear counter of ip prefix-list.
+* clear ip prefix-list NAME:             Clear counter of ip prefix-list.
+* clear ip prefix-list NAME A.B.C.D/M:   Clear counter of ip prefix-list.
+* configure terminal:                    Basic Config Commands.
+* debug event:                           BGP terminal mode commands.
+* debug keepalive:                       BGP terminal mode commands.
+* debug ospf ism:                        Debugging OSPF.
+* debug ospf ism (status|events|timers): Debugging OSPF.
+* debug ospf nsm:                        Debugging OSPF.
+* debug ospf nsm (status|events|timers): Debugging OSPF.
+* debug ospf packet (hello|dd|ls-request|ls-update|ls-ack|all) (send|recv) [detail]: Debugging OSPF.
+* debug rip events:                      ripd Debug Commands.
+* debug rip packet:                      ripd Debug Commands.
+* debug rip zebra:                       ripd Debug Commands.
+* debug ripng events:                    ripngd Terminal Mode Commands.
+* debug ripng packet:                    ripngd Terminal Mode Commands.
+* debug ripng zebra:                     ripngd Terminal Mode Commands.
+* debug update:                          BGP terminal mode commands.
+* description DESCRIPTION ...:           Interface Commands.
+* distribute-list ACCESS_LIST DIRECT IFNAME <1>: ripngd Filtering Commands.
+* distribute-list ACCESS_LIST DIRECT IFNAME: Filtering RIP Routes.
+* distribute-list NAME out bgp:          Redistribute routes to OSPF.
+* distribute-list NAME out connected:    Redistribute routes to OSPF.
+* distribute-list NAME out kernel:       Redistribute routes to OSPF.
+* distribute-list NAME out rip:          Redistribute routes to OSPF.
+* distribute-list NAME out static:       Redistribute routes to OSPF.
+* enable password PASSWORD:              Basic Config Commands.
+* exec-timeout MINUTE:                   Basic Config Commands.
+* exec-timeout MINUTE SECOND:            Basic Config Commands.
+* flush_timer TIME:                      ripngd Configuration.
+* hostname HOSTNAME:                     Basic Config Commands.
+* interface IFNAME:                      Interface Commands.
+* interface IFNAME area AREA:            OSPF6 router.
+* ip address ADDRESS:                    Interface Commands.
+* ip as-path access-list NAME TYPE AS_PATH: AS Path Access List.
+* ip community-list NAME TYPE COMMUNITY: IP Community List.
+* ip ospf authentication-key AUTH_KEY:   OSPF interface.
+* ip ospf cost <1-65535>:                OSPF interface.
+* ip ospf dead-interval <1-65535>:       OSPF interface.
+* ip ospf hello-interval <1-65535>:      OSPF interface.
+* ip ospf message-digest-key KEYID md5 KEY: OSPF interface.
+* ip ospf network (broadcast|non-broadcast|point-to-multipoint|point-to-point): OSPF interface.
+* ip ospf priority <0-255>:              OSPF interface.
+* ip ospf retransmit-interval <1-65535>: OSPF interface.
+* ip ospf transmit-delay:                OSPF interface.
+* ip prefix-list NAME (permit|deny) PREFIX [le LEN] [ge LEN]: IP Prefix List.
+* ip prefix-list NAME description DESC:  ip prefix-list description.
+* ip prefix-list NAME seq NUMBER (permit|deny) PREFIX [le LEN] [ge LEN]: IP Prefix List.
+* ip prefix-list sequence-number:        ip prefix-list sequential number control.
+* ip rip authentication string STRING:   ripd Configuration.
+* ip rip receive version VERSION:        ripd Configuration.
+* ip rip send version VERSION:           ripd Configuration.
+* ip route NETWORK GATEWAY:              Static Route Commands.
+* ipv6 nd prefix-advertisement IPV6PREFIX: Router Advertisement.
+* ipv6 nd send-ra:                       Router Advertisement.
+* ipv6 ospf6 cost COST:                  OSPF6 interface.
+* ipv6 ospf6 dead-interval DEADINTERVAL: OSPF6 interface.
+* ipv6 ospf6 hello-interval HELLOINTERVAL: OSPF6 interface.
+* ipv6 ospf6 priority PRIORITY:          OSPF6 interface.
+* ipv6 ospf6 retransmit-interval RETRANSMITINTERVAL: OSPF6 interface.
+* ipv6 ospf6 transmit-delay TRANSMITDELAY: OSPF6 interface.
+* ipv6 route NETWORK GATEWAY:            Static Route Commands.
+* line vty:                              Basic Config Commands.
+* list:                                  Basic Config Commands.
+* log file FILENAME:                     Basic Config Commands.
+* log stdout:                            Basic Config Commands.
+* log syslog:                            Basic Config Commands.
+* match aspath AS_PATH:                  Route Map Match Command.
+* match community COMMUNITY_LIST:        Route Map Match Command.
+* match interface NAME:                  ripd route-map.
+* match ip address <access-list>:        ripd route-map.
+* match ip address ACCESS_LIST:          Route Map Match Command.
+* match ip next-hop IPV4_ADDR:           Route Map Match Command.
+* match ip next-hot A.B.C.D:             ripd route-map.
+* match metric METRIC:                   Route Map Match Command.
+* match metric N:                        ripd route-map.
+* multicast:                             Interface Commands.
+* neighbor A.B.C.D:                      ripd Configuration.
+* neighbor PEER default-originate:       Peer configuration.
+* neighbor PEER description ...:         Peer configuration.
+* neighbor PEER distribute-list NAME [in|out]: Peer filtering.
+* neighbor PEER dont-capability-negotiate: Multiple Protocol Extension for BGP.
+* neighbor PEER ebgp-multihop:           Peer configuration.
+* neighbor PEER filter-list NAME [in|out]: Peer filtering.
+* neighbor PEER interface IFNAME:        Peer configuration.
+* neighbor PEER maximum-prefix NUMBER:   Peer configuration.
+* neighbor PEER next-hop-self:           Peer configuration.
+* neighbor PEER override-capability:     Multiple Protocol Extension for BGP.
+* neighbor PEER port PORT:               Peer configuration.
+* neighbor PEER prefix-list NAME [in|out]: Peer filtering.
+* neighbor PEER remote-as AS-NUMBER:     BGP peer.
+* neighbor PEER route-map NAME [in|out]: Peer filtering.
+* neighbor PEER route-reflector-client:  Route Reflector.
+* neighbor PEER send-community:          Peer configuration.
+* neighbor PEER shutdown:                Peer configuration.
+* neighbor PEER strict-capability-match: Multiple Protocol Extension for BGP.
+* neighbor PEER update-source:           Peer configuration.
+* neighbor PEER version VERSION:         Peer configuration.
+* neighbor PEER weight WEIGHT:           Peer configuration.
+* network A.B.C.D/M area <0-4294967295>: OSPF router.
+* network A.B.C.D/M area A.B.C.D:        OSPF router.
+* network IFNAME <1>:                    ripngd Configuration.
+* network IFNAME:                        ripd Configuration.
+* network NETWORK <1>:                   BGP network.
+* network NETWORK <2>:                   ripngd Configuration.
+* network NETWORK:                       ripd Configuration.
+* no aggregate-address NETWORK:          BGP network.
+* no area <0-4294967295> authentication: OSPF area.
+* no area <0-4294967295> export-list NAME: OSPF area.
+* no area <0-4294967295> import-list NAME: OSPF area.
+* no area <0-4294967295> range A.B.C.D/M: OSPF area.
+* no area <0-4294967295> shortcut:       OSPF area.
+* no area <0-4294967295> stub:           OSPF area.
+* no area <0-4294967295> stub no-summary: OSPF area.
+* no area <0-4294967295> virtual-link A.B.C.D: OSPF area.
+* no area A.B.C.D authentication:        OSPF area.
+* no area A.B.C.D default-cost <0-16777215>: OSPF area.
+* no area A.B.C.D export-list NAME:      OSPF area.
+* no area A.B.C.D import-list NAME:      OSPF area.
+* no area A.B.C.D range A.B.C.D/M:       OSPF area.
+* no area A.B.C.D range IPV4_PREFIX substitute IPV4_PREFIX: OSPF area.
+* no area A.B.C.D range IPV4_PREFIX suppress: OSPF area.
+* no area A.B.C.D shortcut:              OSPF area.
+* no area A.B.C.D stub:                  OSPF area.
+* no area A.B.C.D stub no-summary:       OSPF area.
+* no area A.B.C.D virtual-link A.B.C.D:  OSPF area.
+* no banner motd:                        Basic Config Commands.
+* no bgp multiple-instance:              Multiple instance.
+* no debug event:                        BGP terminal mode commands.
+* no debug keepalive:                    BGP terminal mode commands.
+* no debug ospf ism:                     Debugging OSPF.
+* no debug ospf ism (status|events|timers): Debugging OSPF.
+* no debug ospf nsm:                     Debugging OSPF.
+* no debug ospf nsm (status|events|timers): Debugging OSPF.
+* no debug ospf packet (hello|dd|ls-request|ls-update|ls-ack|all) (send|recv) [detail]: Debugging OSPF.
+* no debug update:                       BGP terminal mode commands.
+* no distribute-list NAME out bgp:       Redistribute routes to OSPF.
+* no distribute-list NAME out connected: Redistribute routes to OSPF.
+* no distribute-list NAME out kernel:    Redistribute routes to OSPF.
+* no distribute-list NAME out rip:       Redistribute routes to OSPF.
+* no distribute-list NAME out static:    Redistribute routes to OSPF.
+* no exec-timeout:                       Basic Config Commands.
+* no ip ospf authentication-key:         OSPF interface.
+* no ip ospf cost:                       OSPF interface.
+* no ip ospf dead-interval:              OSPF interface.
+* no ip ospf hello-interval:             OSPF interface.
+* no ip ospf message-digest-key:         OSPF interface.
+* no ip ospf network:                    OSPF interface.
+* no ip ospf priority:                   OSPF interface.
+* no ip ospf retransmit interval:        OSPF interface.
+* no ip ospf transmit-delay:             OSPF interface.
+* no ip prefix-list NAME:                IP Prefix List.
+* no ip prefix-list NAME description [DESC]: ip prefix-list description.
+* no ip prefix-list sequence-number:     ip prefix-list sequential number control.
+* no log stdout:                         Basic Config Commands.
+* no log syslog:                         Basic Config Commands.
+* no multicast:                          Interface Commands.
+* no neighbor A.B.C.D:                   ripd Configuration.
+* no neighbor PEER default-originate:    Peer configuration.
+* no neighbor PEER description ...:      Peer configuration.
+* no neighbor PEER dont-capability-negotiate: Multiple Protocol Extension for BGP.
+* no neighbor PEER ebgp-multihop:        Peer configuration.
+* no neighbor PEER interface IFNAME:     Peer configuration.
+* no neighbor PEER maximum-prefix NUMBER: Peer configuration.
+* no neighbor PEER next-hop-self:        Peer configuration.
+* no neighbor PEER override-capability:  Multiple Protocol Extension for BGP.
+* no neighbor PEER route-reflector-client: Route Reflector.
+* no neighbor PEER shutdown:             Peer configuration.
+* no neighbor PEER strict-capability-match: Multiple Protocol Extension for BGP.
+* no neighbor PEER update-source:        Peer configuration.
+* no neighbor PEER weight WEIGHT:        Peer configuration.
+* no network A.B.C.D/M area <0-4294967295>: OSPF router.
+* no network A.B.C.D/M area A.B.C.D:     OSPF router.
+* no network IFNAME:                     ripd Configuration.
+* no network NETWORK <1>:                BGP network.
+* no network NETWORK:                    ripd Configuration.
+* no ospf abr-type TYPE:                 OSPF router.
+* no ospf rfc1583compatibility:          OSPF router.
+* no ospf router-id:                     OSPF router.
+* no redistribute (kernel|connected|static|rip|bgp): Redistribute routes to OSPF.
+* no redistribute (kernel|connected|static|rip|bgp) metric <0-16777214>: Redistribute routes to OSPF.
+* no redistribute (kernel|connected|static|rip|bgp) metric-type (1|2): Redistribute routes to OSPF.
+* no redistribute (kernel|connected|static|rip|bgp) metric-type (1|2) metric <0-16777214>: Redistribute routes to OSPF.
+* no redistribute connected:             ripd Configuration.
+* no redistribute static:                ripd Configuration.
+* no route A.B.C.D/M:                    ripd Configuration.
+* no router bgp AS-NUMBER:               BGP router.
+* no router ospf:                        OSPF router.
+* no router zebra:                       Redistribute routes to OSPF.
+* no shutdown:                           Interface Commands.
+* no smux peer OID:                      SMUX configuration.
+* no smux peer OID PASSWORD:             SMUX configuration.
+* no timers basic:                       ripd Configuration.
+* ospf abr-type TYPE:                    OSPF router.
+* ospf rfc1583compatibility:             OSPF router.
+* ospf router-id A.B.C.D:                OSPF router.
+* password PASSWORD:                     Basic Config Commands.
+* redistribute (kernel|connected|static|rip|bgp): Redistribute routes to OSPF.
+* redistribute (kernel|connected|static|rip|bgp) metric <0-16777214>: Redistribute routes to OSPF.
+* redistribute (kernel|connected|static|rip|bgp) metric-type (1|2): Redistribute routes to OSPF.
+* redistribute (kernel|connected|static|rip|bgp) metric-type (1|2) metric <0-16777214>: Redistribute routes to OSPF.
+* redistribute connected <1>:            Redistribute to BGP.
+* redistribute connected <2>:            Redistribute routes to OSPF6.
+* redistribute connected:                ripd Configuration.
+* redistribute kernel:                   Redistribute to BGP.
+* redistribute ospf:                     Redistribute to BGP.
+* redistribute rip:                      Redistribute to BGP.
+* redistribute ripng:                    Redistribute routes to OSPF6.
+* redistribute static <1>:               Redistribute to BGP.
+* redistribute static <2>:               Redistribute routes to OSPF6.
+* redistribute static:                   ripd Configuration.
+* route A.B.C.D/M:                       ripd Configuration.
+* route NETWORK:                         ripngd Configuration.
+* route-map ROUTE-MAP-NAME permit PRIORITY: Route Map Command.
+* router bgp AS-NUMBER <1>:              BGP instance and view.
+* router bgp AS-NUMBER:                  BGP router.
+* router bgp AS-NUMBER view NAME:        BGP instance and view.
+* router ospf:                           OSPF router.
+* router ospf6:                          OSPF6 router.
+* router rip:                            ripd Configuration.
+* router ripng:                          ripngd Configuration.
+* router zebra <1>:                      Redistribute routes to OSPF.
+* router zebra:                          ripngd Configuration.
+* router-id A.B.C.D:                     OSPF6 router.
+* service advanced-vty:                  Basic Config Commands.
+* service password-encryption:           Basic Config Commands.
+* service terminal-length <0-512>:       Basic Config Commands.
+* set as-path prepend AS_PATH:           Route Map Set Command.
+* set community COMMUNITY:               Route Map Set Command.
+* set ip next-hop IPV4_ADDRESS:          Route Map Set Command.
+* set ipv6 next-hop global IPV6_ADDRESS: Route Map Set Command.
+* set ipv6 next-hop local IPV6_ADDRESS:  Route Map Set Command.
+* set local-preference LOCAL_PREF:       Route Map Set Command.
+* set metric METRIC:                     Route Map Set Command.
+* set metric N:                          ripd route-map.
+* set next-hop A.B.C.D:                  ripd route-map.
+* set weight WEIGHT:                     Route Map Set Command.
+* show debug:                            BGP terminal mode commands.
+* show debugging ospf:                   Debugging OSPF.
+* show debugging rip:                    ripd Debug Commands.
+* show debugging ripng:                  ripngd Terminal Mode Commands.
+* show interface:                        zebra Terminal Mode Commands.
+* show ip bgp [NETWORK]:                 BGP terminal mode commands.
+* show ip bgp neighbor [PEER]:           BGP terminal mode commands.
+* show ip bgp regexp AS-REGEXP:          BGP terminal mode commands.
+* show ip bgp summary:                   BGP terminal mode commands.
+* show ip bgp view NAME:                 Viewing the view.
+* show ip ospf:                          Showing OSPF information.
+* show ip ospf database:                 Showing OSPF information.
+* show ip ospf database adbr-summary:    Showing OSPF information.
+* show ip ospf database external:        Showing OSPF information.
+* show ip ospf database max-age:         Showing OSPF information.
+* show ip ospf database network:         Showing OSPF information.
+* show ip ospf database router:          Showing OSPF information.
+* show ip ospf database self-originate:  Showing OSPF information.
+* show ip ospf database summary:         Showing OSPF information.
+* show ip ospf interface [INTERFACE]:    Showing OSPF information.
+* show ip ospf neighbor:                 Showing OSPF information.
+* show ip ospf neighbor detail:          Showing OSPF information.
+* show ip ospf neighbor INTERFACE:       Showing OSPF information.
+* show ip ospf neighbor INTERFACE detail: Showing OSPF information.
+* show ip ospf refresher:                Showing OSPF information.
+* show ip ospf route:                    Showing OSPF information.
+* show ip prefix-list:                   Showing ip prefix-list.
+* show ip prefix-list detail:            Showing ip prefix-list.
+* show ip prefix-list detail NAME:       Showing ip prefix-list.
+* show ip prefix-list NAME:              Showing ip prefix-list.
+* show ip prefix-list NAME A.B.C.D/M:    Showing ip prefix-list.
+* show ip prefix-list NAME A.B.C.D/M first-match: Showing ip prefix-list.
+* show ip prefix-list NAME A.B.C.D/M longer: Showing ip prefix-list.
+* show ip prefix-list NAME seq NUM:      Showing ip prefix-list.
+* show ip prefix-list summary:           Showing ip prefix-list.
+* show ip prefix-list summary NAME:      Showing ip prefix-list.
+* show ip rip:                           ripd Terminal Mode Commands.
+* show ip ripng:                         ripngd Terminal Mode Commands.
+* show ip route:                         zebra Terminal Mode Commands.
+* show ipforward:                        zebra Terminal Mode Commands.
+* show ipv6 ospf6 [INSTANCE_ID]:         Showing OSPF6 information.
+* show ipv6 ospf6 database:              Showing OSPF6 information.
+* show ipv6 ospf6 interface:             Showing OSPF6 information.
+* show ipv6 ospf6 neighbor:              Showing OSPF6 information.
+* show ipv6 ospf6 request-list A.B.C.D:  Showing OSPF6 information.
+* show ipv6 route:                       zebra Terminal Mode Commands.
+* show ipv6 route ospf6:                 Showing OSPF6 information.
+* show ipv6forward:                      zebra Terminal Mode Commands.
+* show version:                          Basic Config Commands.
+* shutdown:                              Interface Commands.
+* smux peer OID:                         SMUX configuration.
+* smux peer OID PASSWORD:                SMUX configuration.
+* table TABLENO:                         Static Route Commands.
+* terminal length <0-512>:               Basic Config Commands.
+* timers basic UPDATE TIMEOUT GARBAGE:   ripd Configuration.
+* version VERSION:                       ripd Configuration.
+* who:                                   Basic Config Commands.
+* write file:                            Basic Config Commands.
+* write terminal:                        Basic Config Commands.
+
+
+File: zebra.info,  Node: VTY Key Index,  Prev: Command Index,  Up: Top
+
+VTY Key Index
+*************
+
+* Menu:
+
+* <DEL>:                                 CLI Editing Commands.
+* <DOWN>:                                CLI Advanced Commands.
+* <LEFT>:                                CLI Movement Commands.
+* <RIGHT>:                               CLI Movement Commands.
+* <TAB>:                                 CLI Advanced Commands.
+* <UP>:                                  CLI Advanced Commands.
+* ?:                                     CLI Advanced Commands.
+* C-a:                                   CLI Movement Commands.
+* C-b:                                   CLI Movement Commands.
+* C-c:                                   CLI Advanced Commands.
+* C-d:                                   CLI Editing Commands.
+* C-e:                                   CLI Movement Commands.
+* C-f:                                   CLI Movement Commands.
+* C-h:                                   CLI Editing Commands.
+* C-k:                                   CLI Editing Commands.
+* C-n:                                   CLI Advanced Commands.
+* C-p:                                   CLI Advanced Commands.
+* C-t:                                   CLI Editing Commands.
+* C-u:                                   CLI Editing Commands.
+* C-w:                                   CLI Editing Commands.
+* C-z:                                   CLI Advanced Commands.
+* M-b:                                   CLI Movement Commands.
+* M-d:                                   CLI Editing Commands.
+* M-f:                                   CLI Movement Commands.
+
+

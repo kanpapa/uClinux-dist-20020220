@@ -1,0 +1,15 @@
+Author: Rusty Russell <rusty@rustcorp.com.au>
+Status: Recommended (Already in 2.4.1 and above).
+
+This contains three fixes:
+
+1) A fix for complex routing setups, where route by firewall mark is
+   combined with the MASQUERADE NAT target.
+
+2) A fix for a bug in NAT where the second of two overlapping
+   connections is dropped (the code will correctly refuse to map two
+   different connections onto one new connection, but it gives up too
+   easily when this happends).  The most common symptom of this is ssh
+   to or from a box doing masquerading fails, but others are possible.
+
+3) A fix for the mangle table for PowerPC and Sparc boxes.

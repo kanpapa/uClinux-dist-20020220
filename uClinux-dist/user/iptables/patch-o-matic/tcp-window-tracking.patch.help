@@ -1,0 +1,12 @@
+Author: Jozsef Kadlecsik
+Status: proven to be quite stable, but still experimental
+
+This patch is an implementation of TCP connection tracking according
+to the article 'Real Stateful TCP Packet Filtering in IP Filter' by
+Guido van Rooij [1].  It contains the new TCP connection tracking with
+support to handle already established connections.  Window scaling
+support is added.
+
+REQIRES ftp-fixes.patch
+
+[1] http://www.iae.nl/users/guido/papers/tcp_filtering.ps.gz

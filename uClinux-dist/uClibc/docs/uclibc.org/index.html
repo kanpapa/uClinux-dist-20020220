@@ -1,0 +1,391 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"> 
+
+<HTML>
+<HEAD>
+<TITLE>uClibc -- a C library for embedded systems</TITLE>
+</HEAD>
+
+<body text="#000000" alink="#660000" link="#660000" bgcolor="#dee2de" vlink="#660000">
+
+<basefont face="lucida, helvetica, arial" size="3">
+
+
+<CENTER>
+<p>
+
+<TABLE BORDER=0 CELLSPACING=1 CELLPADDING=2>
+    <TR>
+	<td bgcolor="#000000">
+	  <FONT FACE="lucida, helvetica" COLOR="#ccccc0">
+	      <B>µ&nbsp;C&nbsp;l&nbsp;i&nbsp;b&nbsp;c</B>
+	  </FONT>
+	</TD>
+    </TR>
+</TABLE>
+<p>
+
+
+<!-- Begin Introduction section -->
+
+
+<TABLE WIDTH=95% CELLSPACING=1 CELLPADDING=4 BORDER=1>
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="intro"> <BIG><B>
+    uClibc -- a C library for embedded systems
+    </font>
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+<a href="http://www.uclibc.org">uClibc</a> (aka µClibc/pronounced yew-see-lib-see)
+is a C library for embedded Linux systems. It is much smaller then the 
+<a href="http://www.gnu.org/software/libc/libc.html">GNU C Library</a>, but
+nearly all applications supported by glibc also work perfectly with uClibc.
+Porting applications from glibc to uClibc typically involves just recompiling
+the source code. uClibc supports standard Linux architectures (such as x86,
+strongArm, and powerpc), and also supports 
+<a href="http://www.uclinux.org">MMU-less (also known as µClinux)</a>
+architectures such as the Coldfire, Dragonball, and ARM7TDMI micro-controllers.
+If you are building an embedded Linux system and you find that glibc is
+eating up too much space, you should consider using uClibc.  If you are
+building a huge fileserver with 12 Terabytes of storage, then using
+glibc may be a better choice...
+
+<p>
+
+<p>
+uClibc is maintained by 
+<a href="http://www.codepoet.org/andersen/erik/erik.html">Erik Andersen</a>
+and is licensed under the 
+<a href="http://www.gnu.org/copyleft/lgpl.html">GNU LIBRARY GENERAL PUBLIC LICENSE</a>
+.  This license allows you to make closed source commercial applications using 
+uClibc (Please consider sharing some of the money you make ;-).  You do not need 
+to give away all your source code just because you use uClibc and/or run on Linux.
+
+<p>
+
+<!-- Begin Mailing list section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="mailing_list"><BIG><B>
+    Mailing List
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+uClibc has a 
+<a href="http://www.uclibc.org/lists/uclibc/">mailing list</a>.  
+To subscribe, go and visit 
+<a href="http://www.uclibc.org/mailman/listinfo/uclibc">this page</a>.
+
+<p>
+
+
+
+<!-- Begin Applications section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="applications"><BIG><B>
+    Known Working Applications List
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+    uClibc now has a <a href="http://www.uclibc.org/uClibc-apps.html">list of applications</a> 
+    that are known to work.  Submissions are welcome! 
+    Since most applications work just fine with uClibc, we are especially 
+    interested in knowing about any applications that either do not compile
+    at all or do not work properly with uClibc.
+
+    
+    
+<!-- Begin Applications section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="faq"><BIG><B>
+    Frequently Asked Questions
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+	uClibc now has a <a href="http://www.uclibc.org/FAQ.html">list of Frequently Asked Questions</a>.
+	You might want to take a look.
+    
+    
+<!-- Begin Latest News section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="news">
+    <BIG><B>
+    Latest News</A> 
+    </B></BIG>
+    </A>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+<ul>
+
+    <li> <b>4 February 2002, uClibc 0.9.9 Released!</b>
+    <br>
+
+    CodePoet Consulting is pleased to announce the immediate
+    availability of uClibc 0.9.9.  With this release,
+    <a href="http://www.uclibc.org/uClibc-apps.html">just about 
+    everything we have tested now compiles and runs</a>.  In fact,
+    there are now so many programs on the working application list that 
+    rather than continue to add to this list, from now on we 
+    will only be adding applications to the <em>not working list</em>.  Most applications 
+    on the <em>not working list</em> either require pthreads, or require 
+    wide-character support.  Work on wide-character support is
+    well underway, and will hopefully be moving into CVS in the next week or
+    two.  Full pthreads support and rentrancy are on the TODO list
+    and are expected to be complete in the next couple of months.
+    <p>
+    Another very nice change is that we can now build full GNU
+    toolchains (binutils/gcc) that target uClibc.  This brings
+    full C++ support to uClibc.  A C++ toolchain is currently being
+    tested, and will be publicly released in the next couple of days,
+    so stay tuned.
+    <p>
+    The <a href="http://www.uclibc.org/downloads/Changelog">Changelog</a>
+    and <a
+    href="http://www.uclibc.org/downloads/uClibc-0.9.9.tar.bz2">Source code</a> 
+    for this release are available <a href="http://www.uclibc.org/downloads/">here</a>.
+    <p>
+    One final bit on news -- as some of you may have noticed, uclibc.org 
+    has been a bit overloaded and somewhat slow recently.  The server should 
+    be getting colocated tomorrow, which will eliminate the speed problem.  
+    During the move, there may be some temporary disruption of service...
+    <p>
+    Have Fun!
+
+    <p>
+    <li> <b>22 December 2001, uClibc 0.9.8 Released!</b>
+    <br>
+
+    After many months of initial development, we are pleased to announce the
+    release of uClibc 0.9.8.  This release should be quite solid, and is very
+    usable.  This also, hopefully, marks a transition from a slow incubation
+    phase to a more methodical release cycle.  From now one, there should be
+    approximately one release per month.
+    <p>
+    The source code for this release is available
+	<a href="http://www.uclibc.org/downloads/">here</a>.
+
+    <p> <li> <b>Old News</b>
+    <br>
+
+    <a href="http://www.uclibc.org/old-news.html">Click here to read older news</a>.
+    <p>
+
+
+</ul>
+
+<!-- Begin Download section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="download"><BIG><B>
+    Download
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+<ul>
+    <li> There is now a script that creates a daily snapshot tarball of uClibc and posts it on  
+	<a href="http://www.uclibc.org/downloads/uClibc-snapshot.tar.gz">here</a>.
+    <li> uClibc also has a publicly browsable
+	<a href="http://cvs.uclinux.org/cgi-bin/cvsweb/uClibc/">CVS tree</a> (this CVS tree is also mirrored onto 
+	<a href="http://www.uclibc.org/cgi-bin/cvsweb/uClibc/">www.uclibc.org</a> but they are both the same thing).
+    <li> Anonymous
+	<a href="http://cvs.uclinux.org/cvs_anon.html">CVS access</a> is available, and
+	
+    <li> For those that are actively contributing there is even 
+	<a href="http://cvs.uclinux.org/cvs_write.html">CVS write access</a>.
+</ul>
+
+<!-- Begin Applications section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="contribute"><BIG><B>
+    Help Support uClibc development
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+	Do you like uClibc?  Do you need support?  Do you need some feature
+	added to uClibc?  Then why not help out?  We are happy to accept
+	donations, provide support contracts, and implement funded feature
+	requests.  Additionally, uClibc is looking for corporate sponsors to
+	assist development, pay for bandwidth, and help with hardware
+	donations, especially donations of hardware for non-Intel
+	architectures.  Click here to help support uClibc and/or request
+	features.  
+	
+    <!-- Begin PayPal Logo -->
+    <center>
+    <form action="https://www.paypal.com/cgi-bin/webscr" method="post">
+	<input type="hidden" name="cmd" value="_xclick">
+	<input type="hidden" name="business" value="andersen@codepoet.org">
+	<input type="hidden" name="item_name" value="Support uClibc and/or request features">
+	<input type="hidden" name="image_url" value="https://codepoet-consulting.com/images/codepoet.png">
+	<input type="hidden" name="no_shipping" value="1">
+	<input type="image" src="images/donate.png" border="0" name="submit" alt="Make donation using PayPal">
+    </form>
+    </center>
+    <!-- End PayPal Logo -->
+
+    If you prefer to contact us directly for payments (we have a credit card machine so
+    you can avoid online payments), hardware donations, support requests, etc., you can 
+    contact <a href="http://codepoet-consulting.com/">CodePoet Consulting</a> here.
+    
+
+<!-- Begin TODO section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="todo"><BIG><B>
+    TODO
+    </A></B></BIG>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+
+Here are a few things on the TODO list:
+<ul>
+    <li> Shared library support for all supported architectures.
+	We now have our own ld.so, but it needs to be ported to
+	support each architecture. 
+    <li> Shared library support for mmu-less systems.  This is
+	very doable (think of C++ vtables for example), but will
+	take some work.
+    <li> Someone (hopefully) needs to volunteer to take the
+	<a href="http://www.linuxbase.org/test/">LSB Test Suite</a>,
+	pull out the C library testing stuff, and convert it
+	(perl script, by hand, I don't care how) into a form
+	that is usable without having it take over your entire
+	system (i.e. similar to what is currently in the uClibc
+	test suite).  This will be <em>enormously</em> helpful!
+    <li> other things as I think of them.
+</ul>
+    
+
+
+
+<!-- Begin Links section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="links">
+    <BIG><B>
+    Other Open Source C libraries:
+    </A>
+    </B></BIG>
+    </A>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+<ul> 
+
+
+<li><a href="http://www.gnu.org/software/libc/libc.html">GNU C Library (aka glibc)</a> 
+<li> <a href="http://www.k9wk.com/cdoc.html">Al's FREE C Runtime Library</a>
+<li><a href="http://www.fefe.de/dietlibc/">diet libc </a>
+<li>the <a href="http://www.cs.vu.nl/~ast/minix.html">minix</a> 
+    <a href="http://www.cs.vu.nl/cgi-bin/raw/pub/minix/2.0.0/src.tar"
+    >C library</a>
+<li> <a href="http://sources.redhat.com/newlib/">newlib</a>
+<li>and there is a  
+    <a href="ftp://sourceware.cygnus.com/pub/ecos/">C library</a>, for
+    <a href="http://sources.redhat.com/ecos/">eCos</a> as well.
+
+<ul>
+
+
+
+<!-- Begin Links section -->
+
+<TR><TD BGCOLOR="#ccccc0" ALIGN=center>
+    <A NAME="links">
+    <BIG><B>
+    Links to other useful stuff
+    </A>
+    </B></BIG>
+    </A>
+</TD></TR>
+<TR><TD BGCOLOR="#eeeee0">
+
+<ul> 
+
+    <li> <a href="http://www.uclinux.org/">The uClinux home page</a>
+    <p>
+
+    <li> <a href="http://cvs.uclinux.org/">The uClinux CVS repository</a>
+    <p>
+
+    <li> <a href="http://www.uclibc.org/">The uClibc home page</a>
+    <p>
+
+    <li> <a href="http://busybox.net/">BusyBox</a>
+    <p>
+
+    <li> <a href="http://udhcp.busybox.net/">udhcp</a>
+    <p>
+
+    <li> <a href="http://codepoet-consulting.com/">CodePoet Consulting</a>
+    <p>
+
+</ul>
+
+
+
+<!-- End of Table -->
+
+</TD></TR>
+</TABLE>
+</P>
+
+
+
+<!-- Footer -->
+<HR>
+<TABLE WIDTH="100%">
+    <TR>
+	<TD>
+	    <font size="-1" face="arial, helvetica, sans-serif">
+	    Mail all comments, insults, suggestions and bribes to 
+	    <a href="mailto:andersen@codepoet.org">Erik Andersen</a><BR>
+	    </font>
+	</TD>
+
+	<TD>
+	    <a href="http://www.vim.org"><img border=0 width=90 height=36
+	    src="images/written.in.vi.png" 
+	    alt="This site created with the vi editor"></a>
+	</TD>
+
+	<TD>
+	    <a href="http://www.gimp.org/"><img border=0 width=90 height=36
+	    src="images/gfx_by_gimp.png" alt="Graphics by GIMP"></a>
+	</TD>
+
+	<TD>
+	    <a href="http://www.linuxtoday.com"><img width=90 height=36
+	    src="images/ltbutton2.png" alt="Linux Today"></a>
+	</TD>
+
+	<TD>
+	    <p><a href="http://slashdot.org"><img width=90 height=36
+	    src="images/sdsmall.png" alt="Slashdot"></a>
+	</TD>
+
+	<TD>
+	    <a href="http://freshmeat.net"><img width=90 height=36
+	    src="images/fm.mini.png" alt="Freshmeat"></a>
+	</TD>
+
+    </TR>
+</TABLE>
+
+
+</CENTER>
+</BODY>
+</HTML>
+
+ 

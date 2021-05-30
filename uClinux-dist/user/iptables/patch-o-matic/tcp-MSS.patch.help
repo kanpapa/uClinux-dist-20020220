@@ -1,0 +1,14 @@
+Author: Marc Boucher
+Status: Included in kernel 2.4.4
+
+This patch adds the CONFIG_IP_NF_TARGET_TCPMSS and
+CONFIG_IP_NF_MATCH_TCPMSS options, which allow you to examine and
+alter the MSS value of TCP SYN packets, to control the maximum size
+for that connection.  THIS IS A HACK, used to overcome criminally
+braindead ISPs or servers which block ICMP Fragmentation Needed
+packets.
+
+Typical usage:
+
+iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+

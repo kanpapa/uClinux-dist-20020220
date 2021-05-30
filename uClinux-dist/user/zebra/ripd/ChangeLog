@@ -1,0 +1,312 @@
+2000-06-13  David Lipovkov <davidl@nbase.co.il>
+
+	* rip_interface.c (rip_interface_delete): All work is done in
+	rip_if_down().
+
+2000-06-06  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_redistribute_delete): Fix bug of missing
+	route_unlock_node() when redistribute route is not found.
+
+2000-06-05  Akihirof Mizutani <mizutani@dml.com>
+
+	* rip_debug.c (rip_debug_init): Disable show debugging in
+	VIEW_NODE like other protocol daemon.
+
+	* rip_routemap.c: Change command argument to more comprehensive.
+
+	METRIC       -> <0-16>
+	IFNAME       -> WORD
+	IP_ADDR      -> A.B.C.D
+	ACCSESS_LIST -> WORD
+
+2000-06-05  David Lipovkov <davidl@nbase.co.il>
+
+	* rip_interface.c (rip_interface_delete): Delete all routes
+	include static and kernel through the interface , because even if
+	the interface is added again there is no guarantee that it will
+	get the same ifindex as before.
+
+2000-05-31  Akihirof Mizutani <mizutani@dml.com>
+
+	* rip_debug.c: Fix rip debug help string.
+
+2000-04-27  Mirko Karanovic <mkaranov@torsel.alcatel.com>
+
+	* rip_interface.c (rip_interface_down): Remove interface from
+	multicast group when interface goes down.
+
+2000-04-03  David Lipovkov <davidl@nbase.co.il>
+
+	* rip_interface.c (rip_interface_down): Implemented rip functions
+	for interface up/down events: rip_interface_up() and
+	rip_interface_down()
+
+2000-03-16  David Lipovkov <davidl@nbase.co.il>
+
+	* rip_zebra.c (rip_zclient_init): Added rip functions for
+	interface up/down events.
+
+2000-02-15  Hidetoshi Shimokawa <simokawa@sat.t.u-tokyo.ac.jp>
+
+	* ripd.c (rip_write_rte): "set metic" in route-map has no effect
+	for RIPv1 in ripd.  It worked fine for RIPv2.
+
+2000-01-17  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (show_ip_protocols_rip): Fix bug of "show ip protocls"
+	mis-display RIP version.
+
+	* ripd.h (struct rip_peer): Add timeout thread to rip_peer
+	structure.
+
+2000-01-16  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_peer.c: Add new file for supporting RIP peer.
+
+1999-12-26  David Lipovkov <davidl@nbase.co.il>
+
+	* ripd.c (rip_authentication): RIP authantication string is 16
+	bytes long.
+
+1999-12-10  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_read): Add check for minimum packet length.
+	Authentication check is moved from rip_process_response() to
+	rip_read().  Patch from David Lipovkov <davidl@nbase.co.il> is
+	applied then add rte number check by Kunihiro Ishiguro
+	<kunihiro@zebra.org>.
+
+1999-12-07  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_response_process): In case of packet is RIPv2 and
+	network is non zero and netmask is zero, apply netmask rule as
+	same as RIPv1.
+
+1999-11-06  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_timers): Fix bug of timers basic argument format.
+
+1999-11-03  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_snmp.c (rip2IfConfAddress): Forgot to include
+	RIP2IFCONFDOMAIN.
+
+1999-10-28  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.h (struct rip_peer): New structure added.
+
+1999-10-26  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_zebra.c (rip_zebra_ipv4_add): Increment
+	rip_global_route_changes when route change occur.
+	(rip_zebra_ipv4_delete): Likewise.
+
+	* ripd.c (rip_request_process): Increment rip_global_queries when
+	reply to the query is sent.
+
+1999-10-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_debug.c (rip_debug_reset): Reset function added.
+
+	* ripd.c (rip_update_process): Logging bug is fixed. 
+
+1999-10-10  Marc Boucher <marc@mbsi.ca>
+
+	* ripd.c (config_write_rip): Add config_write_distribute() call.
+
+1999-09-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_distribute_update): Fix bug of access-list
+	prefix-list updates.
+
+1999-09-10  VOP <vop@unity.net>
+
+	* rip_zebra.c: Add redistribute route-map feature.
+
+1999-09-10  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_response_process): Add check for given prefix is
+	given mask applied one.
+
+1999-09-03  VOP <vop@unity.net>
+
+	* rip_interface.c (rip_interface_multicast_set): Bug fix about
+	setting multicast interface.
+
+1999-09-02  VOP <vop@unity.net>
+
+	* rip_routemap.c: New file added.
+
+1999-09-02  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (show_ip_protocols_rip): Show next update time.
+	(show_ip_protocols_rip): Show redistribute information.
+
+1999-08-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* RIPv2-MIB.txt: New file added.
+
+	* rip_snmp.c: New file added.
+
+1999-08-24  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_interface.c (ip_rip_authentication_string): RIPv2
+	authentication command is added.
+
+1999-08-23  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_interface.c (rip_interface_multicast_set): Process of
+	setting IP_MULTICAST_IF on specific interface.
+
+	* ripd.c (rip_read): Add packet size check.
+
+1999-08-16  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_request_process): Fill in RIP_METRIC_INFINITY with
+	network byte order using htonl ().
+	(rip_response_process): Pass host byte order address to IN_CLASSC
+	and IN_CLASSB macro.
+
+1999-08-08  davidm@nbase.co.il (David Mozes)
+
+	* rip_zebra.c (rip_zebra_read_ipv4): Fix split horizon problem.
+
+1999-07-03  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_timer_set): Function added.
+
+1999-07-01  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_debug.c: New file added.
+	rip_debug.h: New file added.
+
+1999-07-01  Rick Payne <rickp@rossfell.co.uk>
+
+	* rip_zebra.c (zebra_init): Install standard commands to
+	ZEBRA_NODE.
+
+1999-06-01  David Luyer <luyer@ucs.uwa.edu.au>
+
+	* ripd.c (rip_process_route): Add support for RIP version 1.
+
+1999-05-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_zebra.c: Change to use lib/zclient.[ch].
+
+1999-05-20  Carlos Alberto Barcenilla <barce@frlp.utn.edu.ar>
+
+	* ripd.c (rip_add_route): Change the existance route's metric check
+          to the condition specified by RFC2453. 
+	
+1999-05-17  Carlos Alberto Barcenilla <barce@frlp.utn.edu.ar>
+
+	* ripd.c (rip_process_route): Add the if metric to the route metric.
+
+	* ripd.c (rip_add_route): Deleted add if metric to the route.
+
+1999-05-16  Carlos Alberto Barcenilla <barce@frlp.utn.edu.ar>
+
+	* rip_interface.c (if_valid_neighbor): New function.
+
+	* ripd.c (rip_process_route): Added check whether the datagram
+	is from a valid neighbor.
+	
+1999-05-15  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_process_route): Set interface pointer to rinfo.
+
+1999-05-15  Carlos Alberto Barcenilla <barce@frlp.utn.edu.ar>
+
+	* ripd.c (rip_check_address): Unicast and not net 0 or 127 check
+	added.
+
+1999-05-14  Stephen R. van den Berg <srb@cuci.nl>
+
+	* rip_main.c (signal_init): SIGTERM call sigint.
+	(sigint): Loggging more better message.
+
+1999-05-10  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_add_route): Fix previous route_unlock_node() chenge.
+
+	* rip_main.c (main): Change default zlog output to ZLOG_STDOUT for
+	debugging.
+
+1999-05-09  Patrick Koppen <koppen@rhrk.uni-kl.de>
+
+	* rip_interface.c (rip_request): Fix old semantics for fetching
+	connected address.
+
+	* ripd.c (rip_add_route): Update timer when the route is updated.
+
+1999-05-09  Carlos Alberto Barcenilla <barce@frlp.utn.edu.ar>
+
+	* rip_zebra.c (struct zebra): Add ridist_static, ridist_connect,
+	redist_rip, redist_ripng.  
+
+	* rip_zebra.c (zebra_create): Updated for current zebra method.
+
+	* ripd.c (rip_add_route): Add missing route_unlock_node().
+
+1999-05-03  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_add_route): Add metric check.  Reported by Carlos
+	Alberto Barcenilla <barce@frlp.utn.edu.ar>.
+
+1999-02-18  Peter Galbavy  <Peter.Galbavy@knowledge.com>
+
+	* syslog support added
+
+1998-12-13  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_announce_func): Apply new lib functions.
+
+1998-12-09  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (config_write_rip): Delete vector v argument.
+	* rip_zebra.c (config_write_zebra): Likewise.
+	* rip_interface.c (interface_config_write): Likewise.
+
+1998-09-07  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_announce.c (rip_rib_close): When ripd terminates delete all
+	added route.
+
+1998-09-01  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_interface.c: return read packet size.
+
+1998-05-18  Yamshita TAKAO  <jargon@lares.dti.ne.jp>
+
+	* ripd.h: Modify for compile on Solaris.
+
+1998-05-07  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c: DEFUN function return CMD_SUCCESS.
+		  change xmalloc to XMALLOC macro.
+	
+1998-05-03  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_main.c: change CONFDIR to SYSCONFDIR.
+
+1998-05-01  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* .cvsignore: added.
+
+1998-02-04  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_interface.c (config_write_interface): correct ADVERTISE spell.
+
+	* rip_main.c (main): add usage() and make cleanup.
+
+1998-01-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ripd.c (rip_version): add rip version command.
+
+1998-01-04  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* rip_interface.c (zebra_get_interface): added to get
+	interface's information.
+
+	* ChangeLog: create.

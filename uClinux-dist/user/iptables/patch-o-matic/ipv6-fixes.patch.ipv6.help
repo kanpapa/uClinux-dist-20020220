@@ -1,0 +1,5 @@
+Author: Harald Welte <laforge@gnumonks.org>
+Status: Included in kernel 2.4.2
+
+This fixes up the netfilter for IPv6 code.  It is highly recommended
+if you are running netfilter for IPv6.

@@ -1,0 +1,8 @@
+CONFIG_IP6_NF_MATCH_MARK
+length match support
+CONFIG_IP6_NF_MATCH_LENGTH
+  This option allows you to match the length of a packet against a
+  specific value or range of values.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.

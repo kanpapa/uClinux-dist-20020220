@@ -1,0 +1,20 @@
+Author: Rusty Russell <rusty@rustcorp.com.au> and others.
+Status: Recommended (Already in 2.4.4 and above).
+
+This contains numerous fixes:
+
+1) FTP cleanup:
+	o Fixes for bugtraq-announced FTP security problems.
+	o Understanding of EPSV and EPRT FTP extensions.
+	o Servers with unusual PASV responses are supported.
+	o FTP connection tracking and NAT on unusual ports.
+	o Core "helper" code moved to ip_nat_helper.c.
+2) NAT now doesn't drop untracked packets (eg. multicast, nmap, etc).
+3) SMP race with connection tracking is fixed.
+4) NAT now spreads more evenly, if given a range of IP addresses.
+5) Masquerading now cooperates with diald better.
+6) DNAT and SNAT rules can only be inserted in the "nat" table.
+7) mtr through a connection tracking box will no longer drop 90% of packets.
+8) Reloading the iptable_nat module won't get old, stale NAT information.
+9) First packet of a connection is seen by the helper functions.
+10) "hashsize" parameter to ip_conntrack module.

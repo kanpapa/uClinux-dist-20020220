@@ -1,0 +1,47 @@
+1999-09-01  "A.Waddington" <waddington@usa.net>
+
+	* zebra.texi: Replace @command with @code until it gets ready.
+	Remove @macro.
+
+1999-08-26  Andrew Waddington <waddington@usa.net>
+
+	* bgpd.1: Add man page.
+	ospf6d.1: Likewise.
+	ospfd.1: Likewise.
+	ripd.1: Likewise.
+	ripngd.1: Likewise.
+	zebra.1: Likewise.
+
+1999-08-14  Andrew Waddington <waddington@usa.net>
+
+	* zebra.texi: Many typo is fixed.  Some grammatical rectifications
+	is made.
+
+1999-07-27  Gerhard Poul <gpoul@gnu.org>
+
+	* zebra.texi: Update zebra.texi.
+
+1999-07-02  Gerhard Poul <gpoul@gnu.org>
+
+	* draft-zebra-00.ms: New file added.  This is groff version of
+	draft-zebra-00.txt.  This is a master file of draft-zebra-00.txt.
+
+	* draft-zebra-00.txt: Generated from draft-zebra-00.txt.
+
+1999-05-07  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* zebra.texi (Top): Add ospf6d chapter.
+
+1999-03-31  Jeroen Ruigrok/Asmodai <asmodai@wxs.nl>
+
+	* zebra.texi: Improve some sections.
+
+1999-03-04  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* archfig.tex, zebra.sty, zebra.tex: Temporary removed due to the
+	description is out of date.
+
+1999-02-24  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* texinfo.tex: New file added.  Automake complains the absence of
+	texinfo.tex.

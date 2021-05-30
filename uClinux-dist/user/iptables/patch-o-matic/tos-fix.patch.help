@@ -1,0 +1,5 @@
+Author: Rusty Russell <rusty@linuxcare.com.au>
+Status: Included in kernel 2.4.2
+
+This fixes a bug in the checksum calculation of the TOS bit mangling 
+target. 

@@ -1,0 +1,1 @@
+#undef  CONFIG_IPSEC_DEBUG

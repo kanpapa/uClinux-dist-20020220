@@ -1,0 +1,13 @@
+Author: Guillaume Morin <guillaume@morinfr.org>
+Status: Submitted for kernel inclusion.
+
+Attached patch fixes a bug in the SACKPERM delete function of netfilter.
+
+The previous code replaced SACKPERM with 00 (== end of options) instead of
+01 (== NOOP).
+
+Yes, as discussed on netdev, the right thing is to make netfilter deal with
+SACK correctly.  But until the code for this is in place and tested, we still
+need to delete the SACKPERM option... and we should do it correctly.
+
+

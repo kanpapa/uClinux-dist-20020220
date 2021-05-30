@@ -1,0 +1,195 @@
+.EXPORT_ALL_VARIABLES:
+############################################################################
+
+#
+# Vendor specific settings
+#
+
+BUILD_NETtel = 1
+CONSOLE_BAUD_RATE = 9600
+VENDOR_CFLAGS = -DCONFIG_SECUREEDGE -DCONFIG_NETtel -DCONFIG_X86
+LINUXTARGET = bzImage
+
+ifeq ($(ROOTDIR)/modules,$(wildcard $(ROOTDIR)/modules))
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules
+endif
+
+ifeq ($(ROOTDIR)/boot,$(wildcard $(ROOTDIR)/boot))
+VENDOR_TOPDIRS = boot
+endif
+
+VERSIONPKG = 2.0.0b
+VERSIONSTR = $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+
+############################################################################
+
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all build
+#
+
+# ARCH = kernel,  TARGET_ARCH = uClibc
+
+MACHINE       = i386
+ARCH          = i386
+CROSS_COMPILE = 
+CROSS         = $(CROSS_COMPILE)
+
+CC        = $(CROSS_COMPILE)gcc
+AS        = $(CROSS_COMPILE)as
+CXX       = $(CROSS_COMPILE)g++
+AR        = $(CROSS_COMPILE)ar
+LD        = $(CROSS_COMPILE)ld
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+ELF2FLT   = elf2flt
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+GCC_DIR = $(shell $(CC) -v 2>&1 | grep specs | sed -e 's/.* \(.*\)specs/\1\./')
+
+UCLINUX_BUILD_SET = 0			# have we set a special config below
+
+############################################################################
+
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  :=  -O1 -g
+	LDFLAGS :=
+  else
+	CFLAGS  :=  -O2 -fomit-frame-pointer
+	LDFLAGS := -Wl,-S
+  endif
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -fno-builtin
+	CFLAGS  += -DEMBED
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CFLAGS)
+  ifneq ($(LIBCDIR),glibc/build)
+	ARCH_CFLAGS += -I$(ROOTDIR)
+  endif
+
+	CFLAGS  += -nostdinc -I$(GCC_DIR)/include
+	CFLAGS  += -I$(ROOTDIR)/lib/$(CONFIG_LIBCDIR)/include -I$(ROOTDIR)
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+
+	# the following is needed for uClinux-2.4
+	CFLAGS  += -I$(ROOTDIR)/$(LINUXDIR)/include
+
+	LDLIBS   = -nodefaultlibs
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+	LIBC        = -lc
+	LIBM        = -lm
+	LIBNET      = -lnet
+	LIBDES      = -ldes
+	LIBPCAP     = -lpcap
+	LIBSSL      = -lssl
+	LIBCRYPTO   = -lcrypto
+	LIBCRYPT    = -lcrypt
+	LIBGCC      = -lgcc
+	LIBIBERTY   = -liberty
+	LIBIO       = -lio
+	LIBIOSTREAM = -liostream
+	LIBSTDCPP   = -lstdc++
+  ifeq ($(LIBCDIR),glibc/build)
+	LIBRESOLV   = -lresolv
+  endif
+
+	LDPATH  = \
+			-L$(GCC_DIR) \
+			-L$(ROOTDIR)/lib/$(LIBCDIR)/lib \
+			-L$(ROOTDIR)/lib/libnet \
+			-L$(ROOTDIR)/lib/libdes \
+			-L$(ROOTDIR)/lib/libpcap \
+			-L$(ROOTDIR)/lib/libssl \
+			-L$(ROOTDIR)/lib/zlib
+
+
+	INCGCC  = -I$(GCC_DIR)/include
+	INCLIBC = -I$(ROOTDIR)/lib/$(CONFIG_LIBCDIR)/include
+	INCNET  = -I$(ROOTDIR)/lib/libnet
+	INCDES  = -I$(ROOTDIR)/freeswan/libdes
+	INCGMP  = -I$(ROOTDIR)/lib/libgmp
+	INCPCAP = -I$(ROOTDIR)/lib/libpcap
+	INCSSL  = -I$(ROOTDIR)/lib/libssl/include
+	INCZ    = -I$(ROOTDIR)/lib/zlib
+	INCVEND = -I$(ROOTDIR)/vendors/include
+
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  :=  -O1 -g
+	LDFLAGS :=
+  else
+	CFLAGS  :=  -O2 -fomit-frame-pointer
+	LDFLAGS := -Wl,-s
+  endif
+	CFLAGS  += -fno-builtin
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -Dlinux -D__linux__ -Dunix -DEMBED
+	CFLAGS  += -nostdinc $(INCGCC) $(INCLIBC)
+	CFLAGS  += -I$(ROOTDIR)
+	#
+	# the following is needed for 2.4
+	#
+	CFLAGS  += -I$(ROOTDIR)/$(LINUXDIR)/include
+
+	CXXFLAGS = $(CFLAGS) $(INCCXX) -fname-mangling-version-0
+
+  ifeq ($(LIBCDIR),glibc/build)
+	CRTI     = -nostartfiles $(ROOTDIR)/lib/$(LIBCDIR)/lib/crt1.o \
+			$(ROOTDIR)/lib/$(LIBCDIR)/lib/crti.o \
+			$(GCC_DIR)/crtbegin.o
+	SH_CRTI  = -nostartfiles $(ROOTDIR)/lib/$(LIBCDIR)/lib/crti.o \
+			$(GCC_DIR)/crtbeginS.o
+	CRTN     = $(ROOTDIR)/lib/$(LIBCDIR)/lib/ld-linux.so.2 \
+			$(GCC_DIR)/crtend.o $(ROOTDIR)/lib/$(LIBCDIR)/lib/crtn.o
+	SH_CRTN  = $(GCC_DIR)/crtendS.o $(ROOTDIR)/lib/$(LIBCDIR)/lib/crtn.o
+  else
+	CRTI     = -nostartfiles $(ROOTDIR)/lib/$(LIBCDIR)/libc/crt0.o
+	CRTN     =
+  endif
+	SH_LDFLAGS := $(LDFLAGS) $(SH_CRTI) $(LDPATH)
+	SH_LDLIBS  := -nodefaultlibs $(LIBC) $(LIBGCC) $(SH_CRTN)
+	LDFLAGS += $(CRTI) $(LDPATH)
+	LDLIBS   = -nodefaultlibs $(LIBC) $(LIBGCC) $(CRTN)
+	CXXLIBS  = $(LIBSTDCPP) $(LIBIOSTREAM) $(LIBIO) \
+			$(LIBIBERTY) $(LDLIBS)
+	
+	FLTFLAGS :=
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+endif
+
+############################################################################

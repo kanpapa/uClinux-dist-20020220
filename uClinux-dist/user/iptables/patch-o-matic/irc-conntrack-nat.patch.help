@@ -1,0 +1,8 @@
+Author: Harald Welte <laforge@gnumonks.org>
+Status: Pending for kernel inclusion
+
+This adds CONFIG_IP_NF_IRC: IRC support module for netfilter
+connection tracking and NAT.  This allows DCC to work though NAT and
+connection tracking.
+
+THIS PATCH IS INCOMPATIBLE WITH dropped-table.patch

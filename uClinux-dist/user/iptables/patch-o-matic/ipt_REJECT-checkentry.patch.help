@@ -1,0 +1,7 @@
+Author: Harald Welte <laforge@gnumonks.org>
+Status: Submitted for kernel inclusion
+
+Minor correction to the REJECT target's checkentry function, which had a 
+long-term undiscovered bug which was undiscovered because of cacheline 
+alignment only.
+

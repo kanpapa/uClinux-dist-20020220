@@ -1,0 +1,5 @@
+Author: Jan Rekorajski <baggins@pld.org.pl>
+Status: Stable, might be submitted to kernel soon
+
+This adds CONFIG_IP6_NF_TARGET_LOG option, which adds a LOG target
+to ip6tables.

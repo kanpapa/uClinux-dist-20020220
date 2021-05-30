@@ -1,0 +1,90 @@
+--- working-2.4.0-test11-5/net/ipv4/netfilter/ipt_MASQUERADE.c.~1~	Sun Aug 27 15:11:01 2000
++++ working-2.4.0-test11-5/net/ipv4/netfilter/ipt_MASQUERADE.c	Fri Dec  1 17:56:02 2000
+@@ -68,6 +68,7 @@
+ 	struct ip_nat_multi_range newrange;
+ 	u_int32_t newsrc;
+ 	struct rtable *rt;
++	struct rt_key key;
+ 
+ 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
+ 
+@@ -82,10 +83,14 @@
+ 
+ 	mr = targinfo;
+ 
+-	if (ip_route_output(&rt, (*pskb)->nh.iph->daddr,
+-			    0,
+-			    RT_TOS((*pskb)->nh.iph->tos)|RTO_CONN,
+-			    out->ifindex) != 0) {
++	key.dst = (*pskb)->nh.iph->daddr;
++	key.src = 0; /* Unknown: that's what we're trying to establish */
++	key.tos = RT_TOS((*pskb)->nh.iph->tos)|RTO_CONN;
++	key.oif = out->ifindex;
++#ifdef CONFIG_IP_ROUTE_FWMARK
++	key.fwmark = (*pskb)->nfmark;
++#endif
++	if (ip_route_output_key(&rt, &key) != 0) {
+ 		/* Shouldn't happen */
+ 		printk("MASQUERADE: No route: Rusty's brain broke!\n");
+ 		return NF_DROP;
+diff -urN -X /tmp/filec7dQCa --minimal linux-2.4.0-test6-uml-cvs/net/ipv4/netfilter/ip_nat_core.c working-2.4.0-test6-uml-cvs/net/ipv4/netfilter/ip_nat_core.c
+--- linux-2.4.0-test6-uml-cvs/net/ipv4/netfilter/ip_nat_core.c	Sat Aug 12 00:23:40 2000
++++ working-2.4.0-test6-uml-cvs/net/ipv4/netfilter/ip_nat_core.c	Sat Aug 12 23:01:00 2000
+@@ -438,8 +438,27 @@
+ 								conntrack));
+ 				ret = 1;
+ 				goto clear_fulls;
++			} else if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
++				/* Try implicit source NAT; protocol
++                                   may be able to play with ports to
++                                   make it unique. */
++				struct ip_nat_range r
++					= { IP_NAT_RANGE_MAP_IPS, 
++					    tuple->src.ip, tuple->src.ip,
++					    { 0 }, { 0 } };
++				DEBUGP("Trying implicit mapping\n");
++				if (proto->unique_tuple(tuple, &r,
++							IP_NAT_MANIP_SRC,
++							conntrack)) {
++					/* Must be unique. */
++					IP_NF_ASSERT(!ip_nat_used_tuple
++						     (tuple, conntrack));
++					ret = 1;
++					goto clear_fulls;
++				}
+ 			}
+-			DEBUGP("Protocol can't get unique tuple.\n");
++			DEBUGP("Protocol can't get unique tuple %u.\n",
++			       hooknum);
+ 		}
+ 
+ 		/* Eliminate that from range, and try again. */
+--- pmac/net/ipv4/netfilter/iptable_mangle.c	Thu Aug 31 18:01:36 2000
++++ pmac/net/ipv4/netfilter/iptable_mangle.c	Thu Aug 31 18:09:54 2000
+@@ -47,7 +47,7 @@
+ 		sizeof(struct ipt_entry),
+ 		sizeof(struct ipt_standard),
+ 		0, { 0, 0 }, { } },
+-	      { { { { sizeof(struct ipt_standard_target), "" } }, { } },
++	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
+ 		-NF_ACCEPT - 1 } },
+ 	    /* LOCAL_OUT */
+ 	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+@@ -55,7 +55,7 @@
+ 		sizeof(struct ipt_entry),
+ 		sizeof(struct ipt_standard),
+ 		0, { 0, 0 }, { } },
+-	      { { { { sizeof(struct ipt_standard_target), "" } }, { } },
++	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
+ 		-NF_ACCEPT - 1 } }
+     },
+     /* ERROR */
+@@ -64,7 +64,7 @@
+ 	sizeof(struct ipt_entry),
+ 	sizeof(struct ipt_error),
+ 	0, { 0, 0 }, { } },
+-      { { { { sizeof(struct ipt_error_target), IPT_ERROR_TARGET } },
++      { { { { IPT_ALIGN(sizeof(struct ipt_error_target)), IPT_ERROR_TARGET } },
+ 	  { } },
+ 	"ERROR"
+       }

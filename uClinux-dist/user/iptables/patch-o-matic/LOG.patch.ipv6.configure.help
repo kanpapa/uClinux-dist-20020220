@@ -1,0 +1,8 @@
+CONFIG_IP6_NF_FILTER
+LOG target support
+CONFIG_IP6_NF_TARGET_LOG
+  This option adds a `LOG' target, which allows you to create rules in
+  any ip6tables table which records the packet header to the syslog.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.

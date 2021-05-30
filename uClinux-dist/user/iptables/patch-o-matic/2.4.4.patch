@@ -1,0 +1,2758 @@
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter.h linux-2.4.3-all-fixes/include/linux/netfilter.h
+--- linux-2.4.3-official/include/linux/netfilter.h	Mon Apr 23 19:53:12 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter.h	Tue May  1 13:33:58 2001
+@@ -145,6 +145,8 @@
+ 			struct nf_info *info,
+ 			unsigned int verdict);
+ 
++extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
++
+ #ifdef CONFIG_NETFILTER_DEBUG
+ extern void nf_dump_skb(int pf, struct sk_buff *skb);
+ #endif
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack.h	Fri Mar  9 10:45:18 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack.h	Tue May  1 13:33:58 2001
+@@ -32,6 +32,7 @@
+ #include <linux/types.h>
+ #include <linux/skbuff.h>
+ #include <linux/netfilter_ipv4/ip_conntrack_tcp.h>
++#include <linux/netfilter_ipv4/ip_conntrack_icmp.h>
+ 
+ #ifdef CONFIG_NF_DEBUG
+ #define IP_NF_ASSERT(x)							\
+@@ -56,12 +57,8 @@
+ 	IPS_SEEN_REPLY_BIT = 1,
+ 	IPS_SEEN_REPLY = (1 << IPS_SEEN_REPLY_BIT),
+ 
+-	/* Packet seen leaving box: bit 2 set.  Can be set, not unset. */
+-	IPS_CONFIRMED_BIT = 2,
+-	IPS_CONFIRMED = (1 << IPS_CONFIRMED_BIT),
+-
+ 	/* Conntrack should never be early-expired. */
+-	IPS_ASSURED_BIT = 4,
++	IPS_ASSURED_BIT = 2,
+ 	IPS_ASSURED = (1 << IPS_ASSURED_BIT),
+ };
+ 
+@@ -84,16 +81,11 @@
+ #include <linux/netfilter_ipv4/ip_nat.h>
+ #endif
+ 
+-#if defined(CONFIG_IP_NF_FTP) || defined(CONFIG_IP_NF_FTP_MODULE)
+ #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
+-#ifdef CONFIG_IP_NF_NAT_NEEDED
+-#include <linux/netfilter_ipv4/ip_nat_ftp.h>
+-#endif
+-#endif
+ 
+ struct ip_conntrack
+ {
+-	/* Usage count in here is 1 for destruct timer, 1 per skb,
++	/* Usage count in here is 1 for hash table/destruct timer, 1 per skb,
+            plus 1 for any connection(s) we are `master' for */
+ 	struct nf_conntrack ct_general;
+ 
+@@ -124,21 +116,18 @@
+ 
+ 	union {
+ 		struct ip_ct_tcp tcp;
++		struct ip_ct_icmp icmp;
+ 	} proto;
+ 
+ 	union {
+-#if defined(CONFIG_IP_NF_FTP) || defined(CONFIG_IP_NF_FTP_MODULE)
+ 		struct ip_ct_ftp ct_ftp_info;
+-#endif
+ 	} help;
+ 
+ #ifdef CONFIG_IP_NF_NAT_NEEDED
+ 	struct {
+ 		struct ip_nat_info info;
+ 		union {
+-#if defined(CONFIG_IP_NF_FTP) || defined(CONFIG_IP_NF_FTP_MODULE)
+-			struct ip_nat_ftp_info ftp_info[IP_CT_DIR_MAX];
+-#endif
++			/* insert nat helper private data here */
+ 		} help;
+ #if defined(CONFIG_IP_NF_TARGET_MASQUERADE) || \
+ 	defined(CONFIG_IP_NF_TARGET_MASQUERADE_MODULE)
+@@ -186,5 +175,13 @@
+ extern void
+ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
+ 			void *data);
++
++/* It's confirmed if it is, or has been in the hash table. */
++static inline int is_confirmed(struct ip_conntrack *ct)
++{
++	return ct->tuplehash[IP_CT_DIR_ORIGINAL].list.next != NULL;
++}
++
++extern unsigned int ip_conntrack_htable_size;
+ #endif /* __KERNEL__ */
+ #endif /* _IP_CONNTRACK_H */
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_core.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_core.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_core.h	Mon Apr 23 19:53:25 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_core.h	Tue May  1 13:33:58 2001
+@@ -33,10 +33,17 @@
+ ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
+ 		      const struct ip_conntrack *ignored_conntrack);
+ 
+-/* Confirm a connection */
+-void ip_conntrack_confirm(struct ip_conntrack *ct);
++extern int __ip_conntrack_confirm(struct nf_ct_info *nfct);
++
++/* Confirm a connection: returns NF_DROP if packet must be dropped. */
++static inline int ip_conntrack_confirm(struct sk_buff *skb)
++{
++	if (skb->nfct
++	    && !is_confirmed((struct ip_conntrack *)skb->nfct->master))
++		return __ip_conntrack_confirm(skb->nfct);
++	return NF_ACCEPT;
++}
+ 
+-extern unsigned int ip_conntrack_htable_size;
+ extern struct list_head *ip_conntrack_hash;
+ extern struct list_head expect_list;
+ DECLARE_RWLOCK_EXTERN(ip_conntrack_lock);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_ftp.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_ftp.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_ftp.h	Sun Apr 22 18:14:03 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_ftp.h	Tue May  1 13:33:44 2001
+@@ -14,9 +14,13 @@
+ enum ip_ct_ftp_type
+ {
+ 	/* PORT command from client */
+-	IP_CT_FTP_PORT = IP_CT_DIR_ORIGINAL,
++	IP_CT_FTP_PORT,
+ 	/* PASV response from server */
+-	IP_CT_FTP_PASV = IP_CT_DIR_REPLY
++	IP_CT_FTP_PASV,
++	/* EPRT command from client */
++	IP_CT_FTP_EPRT,
++	/* EPSV response from server */
++	IP_CT_FTP_EPSV,
+ };
+ 
+ /* We record seq number and length of ftp ip/port text here: all in
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_icmp.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_icmp.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_icmp.h	Thu Jan  1 10:00:00 1970
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_icmp.h	Tue May  1 13:33:58 2001
+@@ -0,0 +1,11 @@
++#ifndef _IP_CONNTRACK_ICMP_H
++#define _IP_CONNTRACK_ICMP_H
++/* ICMP tracking. */
++#include <asm/atomic.h>
++
++struct ip_ct_icmp
++{
++	/* Optimization: when number in == number out, forget immediately. */
++	atomic_t count;
++};
++#endif /* _IP_CONNTRACK_ICMP_H */
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_protocol.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_protocol.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_conntrack_protocol.h	Fri Apr 27 17:43:21 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_conntrack_protocol.h	Tue May  1 13:33:58 2001
+@@ -38,9 +38,9 @@
+ 		      enum ip_conntrack_info ctinfo);
+ 
+ 	/* Called when a new connection for this protocol found;
+-	 * returns timeout.  If so, packet() called next. */
+-	unsigned long (*new)(struct ip_conntrack *conntrack,
+-			     struct iphdr *iph, size_t len);
++	 * returns TRUE if it's OK.  If so, packet() called next. */
++	int (*new)(struct ip_conntrack *conntrack, struct iphdr *iph,
++		   size_t len);
+ 
+ 	/* Module (if any) which this is connected to. */
+ 	struct module *me;
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_nat.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_nat.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_nat.h	Sun Apr 22 18:14:03 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_nat.h	Tue May  1 13:33:44 2001
+@@ -24,6 +24,15 @@
+ /* Used internally by get_unique_tuple(). */
+ #define IP_NAT_RANGE_FULL 4
+ 
++/* NAT sequence number modifications */
++struct ip_nat_seq {
++	/* position of the last TCP sequence number 
++	 * modification (if any) */
++	u_int32_t correction_pos;
++	/* sequence number offset before and after last modification */
++	int32_t offset_before, offset_after;
++};
++
+ /* Single range specification. */
+ struct ip_nat_range
+ {
+@@ -98,6 +107,8 @@
+ 
+ 	/* Helper (NULL if none). */
+ 	struct ip_nat_helper *helper;
++
++	struct ip_nat_seq seq[IP_CT_DIR_MAX];
+ };
+ 
+ /* Set up the info structure to map into this range. */
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_nat_ftp.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_nat_ftp.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_nat_ftp.h	Sat Mar 18 05:56:20 2000
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_nat_ftp.h	Thu Jan  1 10:00:00 1970
+@@ -1,21 +0,0 @@
+-#ifndef _IP_NAT_FTP_H
+-#define _IP_NAT_FTP_H
+-/* FTP extension for TCP NAT alteration. */
+-
+-#ifndef __KERNEL__
+-#error Only in kernel.
+-#endif
+-
+-/* Protects ftp part of conntracks */
+-DECLARE_LOCK_EXTERN(ip_ftp_lock);
+-
+-/* We keep track of where the last SYN correction was, and the SYN
+-   offsets before and after that correction.  Two of these (indexed by
+-   direction). */
+-struct ip_nat_ftp_info
+-{
+-	u_int32_t syn_correction_pos;                              
+-	int32_t syn_offset_before, syn_offset_after; 
+-};
+-
+-#endif /* _IP_NAT_FTP_H */
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/include/linux/netfilter_ipv4/ip_nat_helper.h linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_nat_helper.h
+--- linux-2.4.3-official/include/linux/netfilter_ipv4/ip_nat_helper.h	Sun Apr 22 18:33:58 2001
++++ linux-2.4.3-all-fixes/include/linux/netfilter_ipv4/ip_nat_helper.h	Tue May  1 13:33:44 2001
+@@ -25,6 +25,19 @@
+ 	const char *name;
+ };
+ 
++extern struct list_head helpers;
++
+ extern int ip_nat_helper_register(struct ip_nat_helper *me);
+ extern void ip_nat_helper_unregister(struct ip_nat_helper *me);
++extern int ip_nat_mangle_tcp_packet(struct sk_buff **skb,
++				struct ip_conntrack *ct,
++				enum ip_conntrack_info ctinfo,
++				unsigned int match_offset,
++				unsigned int match_len,
++				char *rep_buffer,
++				unsigned int rep_len);
++extern int ip_nat_seq_adjust(struct sk_buff *skb,
++				struct ip_conntrack *ct,
++				enum ip_conntrack_info ctinfo);
++extern void ip_nat_delete_sack(struct sk_buff *skb, struct tcphdr *tcph);
+ #endif
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/core/netfilter.c linux-2.4.3-all-fixes/net/core/netfilter.c
+--- linux-2.4.3-official/net/core/netfilter.c	Wed Jan 31 11:19:09 2001
++++ linux-2.4.3-all-fixes/net/core/netfilter.c	Tue May  1 13:33:58 2001
+@@ -540,6 +540,12 @@
+ 	return;
+ }
+ 
++/* This does not belong here, but ipt_REJECT needs it if connection
++   tracking in use: without this, connection may not be in hash table,
++   and hence manufactured ICMP or RST packets will not be associated
++   with it. */
++void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
++
+ void __init netfilter_init(void)
+ {
+ 	int i, h;
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/Makefile linux-2.4.3-all-fixes/net/ipv4/netfilter/Makefile
+--- linux-2.4.3-official/net/ipv4/netfilter/Makefile	Wed Apr  4 04:25:41 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/Makefile	Tue May  1 13:33:44 2001
+@@ -20,7 +20,7 @@
+ 
+ # objects for the standalone - connection tracking / NAT
+ ip_conntrack-objs	:= ip_conntrack_standalone.o $(ip_nf_conntrack-objs)
+-iptable_nat-objs	:= ip_nat_standalone.o ip_nat_rule.o $(ip_nf_nat-objs)
++iptable_nat-objs	:= ip_nat_standalone.o ip_nat_rule.o ip_nat_helper.o $(ip_nf_nat-objs)
+ 
+ # objects for backwards compatibility mode
+ ip_nf_compat-objs	:= ip_fw_compat.o ip_fw_compat_redir.o ip_fw_compat_masq.o $(ip_nf_conntrack-objs) $(ip_nf_nat-objs)
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_core.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_core.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_core.c	Thu Feb  1 15:26:32 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_core.c	Tue May  1 13:35:29 2001
+@@ -23,6 +23,8 @@
+ #include <linux/stddef.h>
+ #include <linux/sysctl.h>
+ #include <linux/slab.h>
++/* For ERR_PTR().  Yeah, I know... --RR */
++#include <linux/fs.h>
+ 
+ /* This rwlock protects the main hash table, protocol/helper/expected
+    registrations, conntrack timers*/
+@@ -152,7 +154,9 @@
+ clean_from_lists(struct ip_conntrack *ct)
+ {
+ 	MUST_BE_WRITE_LOCKED(&ip_conntrack_lock);
+-	/* Remove from both hash lists */
++	/* Remove from both hash lists: must not NULL out next ptrs,
++           otherwise we'll look unconfirmed.  Fortunately, LIST_DELETE
++           doesn't do this. --RR */
+ 	LIST_DELETE(&ip_conntrack_hash
+ 		    [hash_conntrack(&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple)],
+ 		    &ct->tuplehash[IP_CT_DIR_ORIGINAL]);
+@@ -172,24 +176,6 @@
+ {
+ 	struct ip_conntrack *ct = (struct ip_conntrack *)nfct;
+ 
+-	/* Unconfirmed connections haven't been cleaned up by the
+-	   timer: hence they cannot be simply deleted here. */
+-	if (!(ct->status & IPS_CONFIRMED)) {
+-		WRITE_LOCK(&ip_conntrack_lock);
+-		/* Race check: they can't get a reference if noone has
+-                   one and we have the write lock. */
+-		if (atomic_read(&ct->ct_general.use) == 0) {
+-			clean_from_lists(ct);
+-			WRITE_UNLOCK(&ip_conntrack_lock);
+-		} else {
+-			/* Either a last-minute confirmation (ie. ct
+-			   now has timer attached), or a last-minute
+-			   new skb has reference (still unconfirmed). */
+-			WRITE_UNLOCK(&ip_conntrack_lock);
+-			return;
+-		}
+-	}
+-
+ 	IP_NF_ASSERT(atomic_read(&nfct->use) == 0);
+ 	IP_NF_ASSERT(!timer_pending(&ct->timeout));
+ 
+@@ -207,7 +193,6 @@
+ 	struct ip_conntrack *ct = (void *)ul_conntrack;
+ 
+ 	WRITE_LOCK(&ip_conntrack_lock);
+-	IP_NF_ASSERT(ct->status & IPS_CONFIRMED);
+ 	clean_from_lists(ct);
+ 	WRITE_UNLOCK(&ip_conntrack_lock);
+ 	ip_conntrack_put(ct);
+@@ -253,24 +238,85 @@
+ 	return h;
+ }
+ 
+-/* Confirm a connection */
+-void
+-ip_conntrack_confirm(struct ip_conntrack *ct)
++static inline struct ip_conntrack *
++__ip_conntrack_get(struct nf_ct_info *nfct, enum ip_conntrack_info *ctinfo)
+ {
++	struct ip_conntrack *ct
++		= (struct ip_conntrack *)nfct->master;
++
++	/* ctinfo is the index of the nfct inside the conntrack */
++	*ctinfo = nfct - ct->infos;
++	IP_NF_ASSERT(*ctinfo >= 0 && *ctinfo < IP_CT_NUMBER);
++	return ct;
++}
++
++/* Return conntrack and conntrack_info given skb->nfct->master */
++struct ip_conntrack *
++ip_conntrack_get(struct sk_buff *skb, enum ip_conntrack_info *ctinfo)
++{
++	if (skb->nfct) 
++		return __ip_conntrack_get(skb->nfct, ctinfo);
++	return NULL;
++}
++
++/* Confirm a connection given skb->nfct; places it in hash table */
++int
++__ip_conntrack_confirm(struct nf_ct_info *nfct)
++{
++	unsigned int hash, repl_hash;
++	struct ip_conntrack *ct;
++	enum ip_conntrack_info ctinfo;
++
++	ct = __ip_conntrack_get(nfct, &ctinfo);
++
++	/* ipt_REJECT uses ip_conntrack_attach to attach related
++	   ICMP/TCP RST packets in other direction.  Actual packet
++	   which created connection will be IP_CT_NEW or for an
++	   expected connection, IP_CT_RELATED. */
++	if (CTINFO2DIR(ctinfo) != IP_CT_DIR_ORIGINAL)
++		return NF_ACCEPT;
++
++	hash = hash_conntrack(&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
++	repl_hash = hash_conntrack(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
++
++	/* We're not in hash table, and we refuse to set up related
++	   connections for unconfirmed conns.  But packet copies and
++	   REJECT will give spurious warnings here. */
++	/* IP_NF_ASSERT(atomic_read(&ct->ct_general.use) == 1); */
++
++	/* No external references means noone else could have
++           confirmed us. */
++	IP_NF_ASSERT(!is_confirmed(ct));
+ 	DEBUGP("Confirming conntrack %p\n", ct);
++
+ 	WRITE_LOCK(&ip_conntrack_lock);
+-	/* Race check */
+-	if (!(ct->status & IPS_CONFIRMED)) {
+-		IP_NF_ASSERT(!timer_pending(&ct->timeout));
+-		set_bit(IPS_CONFIRMED_BIT, &ct->status);
++	/* See if there's one in the list already, including reverse:
++           NAT could have grabbed it without realizing, since we're
++           not in the hash.  If there is, we lost race. */
++	if (!LIST_FIND(&ip_conntrack_hash[hash],
++		       conntrack_tuple_cmp,
++		       struct ip_conntrack_tuple_hash *,
++		       &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple, NULL)
++	    && !LIST_FIND(&ip_conntrack_hash[repl_hash],
++			  conntrack_tuple_cmp,
++			  struct ip_conntrack_tuple_hash *,
++			  &ct->tuplehash[IP_CT_DIR_REPLY].tuple, NULL)) {
++		list_prepend(&ip_conntrack_hash[hash],
++			     &ct->tuplehash[IP_CT_DIR_ORIGINAL]);
++		list_prepend(&ip_conntrack_hash[repl_hash],
++			     &ct->tuplehash[IP_CT_DIR_REPLY]);
+ 		/* Timer relative to confirmation time, not original
+ 		   setting time, otherwise we'd get timer wrap in
+ 		   wierd delay cases. */
+ 		ct->timeout.expires += jiffies;
+ 		add_timer(&ct->timeout);
+ 		atomic_inc(&ct->ct_general.use);
++		WRITE_UNLOCK(&ip_conntrack_lock);
++		return NF_ACCEPT;
+ 	}
++
+ 	WRITE_UNLOCK(&ip_conntrack_lock);
++	return NF_DROP;
+ }
+ 
+ /* Returns true if a connection correspondings to the tuple (required
+@@ -374,30 +420,16 @@
+ 			*ctinfo += IP_CT_IS_REPLY;
+ 	}
+ 
+-	/* REJECT target does this commonly, so allow locally
+-           generated ICMP errors --RR */
+-	if (!(h->ctrack->status & IPS_CONFIRMED)
+-	    && hooknum != NF_IP_LOCAL_OUT) {
+-		DEBUGP("icmp_error_track: unconfirmed\n");
+-		ip_conntrack_put(h->ctrack);
+-		return NULL;
+-	}
+-
+ 	/* Update skb to refer to this connection */
+ 	skb->nfct = &h->ctrack->infos[*ctinfo];
+ 	return h->ctrack;
+ }
+ 
+-/* There's a small race here where we may free a just-replied to
++/* There's a small race here where we may free a just-assured
+    connection.  Too bad: we're in trouble anyway. */
+ static inline int unreplied(const struct ip_conntrack_tuple_hash *i)
+ {
+-	/* Unconfirmed connections either really fresh or transitory
+-           anyway */
+-	if (!(i->ctrack->status & IPS_ASSURED)
+-	    && (i->ctrack->status & IPS_CONFIRMED))
+-		return 1;
+-	return 0;
++	return !(i->ctrack->status & IPS_ASSURED);
+ }
+ 
+ static int early_drop(struct list_head *chain)
+@@ -436,10 +468,9 @@
+ 	return ip_ct_tuple_mask_cmp(tuple, &i->tuple, &i->mask);
+ }
+ 
+-/* Allocate a new conntrack; we set everything up, then grab write
+-   lock and see if we lost a race.  If we lost it we return 0,
+-   indicating the controlling code should look again. */
+-static int
++/* Allocate a new conntrack: we return -ENOMEM if classification
++   failed due to stress.  Otherwise it really is unclassifiable. */
++static struct ip_conntrack_tuple_hash *
+ init_conntrack(const struct ip_conntrack_tuple *tuple,
+ 	       struct ip_conntrack_protocol *protocol,
+ 	       struct sk_buff *skb)
+@@ -448,8 +479,6 @@
+ 	struct ip_conntrack_tuple repl_tuple;
+ 	size_t hash, repl_hash;
+ 	struct ip_conntrack_expect *expected;
+-	enum ip_conntrack_info ctinfo;
+-	unsigned long extra_jiffies;
+ 	int i;
+ 	static unsigned int drop_next = 0;
+ 
+@@ -457,30 +486,31 @@
+ 
+ 	if (ip_conntrack_max &&
+ 	    atomic_read(&ip_conntrack_count) >= ip_conntrack_max) {
+-		if (net_ratelimit())
+-			printk(KERN_WARNING "ip_conntrack: maximum limit of"
+-			       " %d entries exceeded\n", ip_conntrack_max);
+-
+ 		/* Try dropping from random chain, or else from the
+                    chain about to put into (in case they're trying to
+                    bomb one hash chain). */
+ 		if (drop_next >= ip_conntrack_htable_size)
+ 			drop_next = 0;
+ 		if (!early_drop(&ip_conntrack_hash[drop_next++])
+-		    && !early_drop(&ip_conntrack_hash[hash]))
+-			return 1;
++		    && !early_drop(&ip_conntrack_hash[hash])) {
++			if (net_ratelimit())
++				printk(KERN_WARNING
++				       "ip_conntrack: table full, dropping"
++				       " packet.\n");
++			return ERR_PTR(-ENOMEM);
++		}
+ 	}
+ 
+ 	if (!invert_tuple(&repl_tuple, tuple, protocol)) {
+ 		DEBUGP("Can't invert tuple.\n");
+-		return 1;
++		return NULL;
+ 	}
+ 	repl_hash = hash_conntrack(&repl_tuple);
+ 
+ 	conntrack = kmem_cache_alloc(ip_conntrack_cachep, GFP_ATOMIC);
+ 	if (!conntrack) {
+ 		DEBUGP("Can't allocate conntrack.\n");
+-		return 1;
++		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+ 	memset(conntrack, 0, sizeof(struct ip_conntrack));
+@@ -493,32 +523,33 @@
+ 	for (i=0; i < IP_CT_NUMBER; i++)
+ 		conntrack->infos[i].master = &conntrack->ct_general;
+ 
+-	extra_jiffies = protocol->new(conntrack, skb->nh.iph, skb->len);
+-	if (!extra_jiffies) {
++	if (!protocol->new(conntrack, skb->nh.iph, skb->len)) {
+ 		kmem_cache_free(ip_conntrack_cachep, conntrack);
+-		return 1;
++		return NULL;
+ 	}
+ 	/* Don't set timer yet: wait for confirmation */
+ 	init_timer(&conntrack->timeout);
+ 	conntrack->timeout.data = (unsigned long)conntrack;
+ 	conntrack->timeout.function = death_by_timeout;
+-	conntrack->timeout.expires = extra_jiffies;
+ 
+-	/* Sew in at head of hash list. */
++	/* Mark clearly that it's not in the hash table. */
++	conntrack->tuplehash[IP_CT_DIR_ORIGINAL].list.next = NULL;
++
++	/* Write lock required for deletion of expected.  Without
++           this, a read-lock would do. */
+ 	WRITE_LOCK(&ip_conntrack_lock);
+-	/* Check noone else beat us in the race... */
+-	if (__ip_conntrack_find(tuple, NULL)) {
+-		WRITE_UNLOCK(&ip_conntrack_lock);
+-		kmem_cache_free(ip_conntrack_cachep, conntrack);
+-		return 0;
+-	}
+ 	conntrack->helper = LIST_FIND(&helpers, helper_cmp,
+ 				      struct ip_conntrack_helper *,
+ 				      &repl_tuple);
+ 	/* Need finding and deleting of expected ONLY if we win race */
+ 	expected = LIST_FIND(&expect_list, expect_cmp,
+ 			     struct ip_conntrack_expect *, tuple);
+-	if (expected) {
++	/* If master is not in hash table yet (ie. packet hasn't left
++	   this machine yet), how can other end know about expected?
++	   Hence these are not the droids you are looking for (if
++	   master ct never got confirmed, we'd hold a reference to it
++	   and weird things would happen to future packets). */
++	if (expected && is_confirmed(expected->expectant)) {
+ 		/* Welcome, Mr. Bond.  We've been expecting you... */
+ 		conntrack->status = IPS_EXPECTED;
+ 		conntrack->master.master = &expected->expectant->ct_general;
+@@ -526,23 +557,13 @@
+ 		LIST_DELETE(&expect_list, expected);
+ 		expected->expectant = NULL;
+ 		nf_conntrack_get(&conntrack->master);
+-		ctinfo = IP_CT_RELATED;
+-	} else {
+-		ctinfo = IP_CT_NEW;
+ 	}
+-	list_prepend(&ip_conntrack_hash[hash],
+-		     &conntrack->tuplehash[IP_CT_DIR_ORIGINAL]);
+-	list_prepend(&ip_conntrack_hash[repl_hash],
+-		     &conntrack->tuplehash[IP_CT_DIR_REPLY]);
+ 	atomic_inc(&ip_conntrack_count);
+ 	WRITE_UNLOCK(&ip_conntrack_lock);
+ 
+-	/* Update skb to refer to this connection */
+-	skb->nfct = &conntrack->infos[ctinfo];
+ 	if (expected && expected->expectfn)
+ 		expected->expectfn(conntrack);
+-
+-	return 1;
++	return &conntrack->tuplehash[IP_CT_DIR_ORIGINAL];
+ }
+ 
+ /* On success, returns conntrack ptr, sets skb->nfct and ctinfo */
+@@ -561,38 +582,18 @@
+ 	if (!get_tuple(skb->nh.iph, skb->len, &tuple, proto))
+ 		return NULL;
+ 
+-	/* Loop around search/insert race */
+-	do {
+-		/* look for tuple match */
+-		h = ip_conntrack_find_get(&tuple, NULL);
+-		if (!h && init_conntrack(&tuple, proto, skb))
++	/* look for tuple match */
++	h = ip_conntrack_find_get(&tuple, NULL);
++	if (!h) {
++		h = init_conntrack(&tuple, proto, skb);
++		if (!h)
+ 			return NULL;
+-	} while (!h);
++		if (IS_ERR(h))
++			return (void *)h;
++	}
+ 
+ 	/* It exists; we have (non-exclusive) reference. */
+ 	if (DIRECTION(h) == IP_CT_DIR_REPLY) {
+-		/* Reply on unconfirmed connection => unclassifiable */
+-		if (!(h->ctrack->status & IPS_CONFIRMED)) {
+-			/* Exception: local TCP RSTs (generated by
+-                           REJECT target). */
+-			if (hooknum == NF_IP_LOCAL_OUT
+-			    && h->tuple.dst.protonum == IPPROTO_TCP) {
+-				const struct tcphdr *tcph
+-					= (const struct tcphdr *)
+-					((u_int32_t *)skb->nh.iph
+-					 + skb->nh.iph->ihl);
+-				if (tcph->rst) {
+-					*ctinfo	= IP_CT_ESTABLISHED
+-						+ IP_CT_IS_REPLY;
+-					*set_reply = 0;
+-					goto set_skb;
+-				}
+-			}
+-			DEBUGP("Reply on unconfirmed connection\n");
+-			ip_conntrack_put(h->ctrack);
+-			return NULL;
+-		}
+-
+ 		*ctinfo = IP_CT_ESTABLISHED + IP_CT_IS_REPLY;
+ 		/* Please set reply bit if this packet OK */
+ 		*set_reply = 1;
+@@ -613,28 +614,10 @@
+ 		}
+ 		*set_reply = 0;
+ 	}
+- set_skb:
+ 	skb->nfct = &h->ctrack->infos[*ctinfo];
+ 	return h->ctrack;
+ }
+ 
+-/* Return conntrack and conntrack_info a given skb */
+-inline struct ip_conntrack *
+-ip_conntrack_get(struct sk_buff *skb, enum ip_conntrack_info *ctinfo)
+-{
+-	if (skb->nfct) {
+-		struct ip_conntrack *ct
+-			= (struct ip_conntrack *)skb->nfct->master;
+-
+-		/* ctinfo is the index of the nfct inside the conntrack */
+-		*ctinfo = skb->nfct - ct->infos;
+-		IP_NF_ASSERT(*ctinfo >= 0 && *ctinfo < IP_CT_NUMBER);
+-		return ct;
+-	}
+-	return NULL;
+-}
+-
+-
+ /* Netfilter hook itself. */
+ unsigned int ip_conntrack_in(unsigned int hooknum,
+ 			     struct sk_buff **pskb,
+@@ -689,6 +672,10 @@
+ 		/* Not valid part of a connection */
+ 		return NF_ACCEPT;
+ 
++	if (IS_ERR(ct))
++		/* Too stressed to deal. */
++		return NF_DROP;
++
+ 	IP_NF_ASSERT((*pskb)->nfct);
+ 
+ 	ret = proto->packet(ct, (*pskb)->nh.iph, (*pskb)->len, ctinfo);
+@@ -783,23 +770,18 @@
+ int ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
+ 			     const struct ip_conntrack_tuple *newreply)
+ {
+-	unsigned int newindex = hash_conntrack(newreply);
+-
+ 	WRITE_LOCK(&ip_conntrack_lock);
+ 	if (__ip_conntrack_find(newreply, conntrack)) {
+ 		WRITE_UNLOCK(&ip_conntrack_lock);
+ 		return 0;
+ 	}
++	/* Should be unconfirmed, so not in hash table yet */
++	IP_NF_ASSERT(!is_confirmed(conntrack));
++
+ 	DEBUGP("Altering reply tuple of %p to ", conntrack);
+ 	DUMP_TUPLE(newreply);
+ 
+-	LIST_DELETE(&ip_conntrack_hash
+-		    [hash_conntrack(&conntrack->tuplehash[IP_CT_DIR_REPLY]
+-				    .tuple)],
+-		    &conntrack->tuplehash[IP_CT_DIR_REPLY]);
+ 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = *newreply;
+-	list_prepend(&ip_conntrack_hash[newindex],
+-		     &conntrack->tuplehash[IP_CT_DIR_REPLY]);
+ 	conntrack->helper = LIST_FIND(&helpers, helper_cmp,
+ 				      struct ip_conntrack_helper *,
+ 				      newreply);
+@@ -861,8 +843,8 @@
+ 	IP_NF_ASSERT(ct->timeout.data == (unsigned long)ct);
+ 
+ 	WRITE_LOCK(&ip_conntrack_lock);
+-	/* Timer may not be active yet */
+-	if (!(ct->status & IPS_CONFIRMED))
++	/* If not in hash table, timer will not be active yet */
++	if (!is_confirmed(ct))
+ 		ct->timeout.expires = extra_jiffies;
+ 	else {
+ 		/* Need del_timer for race avoidance (may already be dying). */
+@@ -909,6 +891,26 @@
+ 	return skb;
+ }
+ 
++/* Used by ipt_REJECT. */
++static void ip_conntrack_attach(struct sk_buff *nskb, struct nf_ct_info *nfct)
++{
++	struct ip_conntrack *ct;
++	enum ip_conntrack_info ctinfo;
++
++	ct = __ip_conntrack_get(nfct, &ctinfo);
++
++	/* This ICMP is in reverse direction to the packet which
++           caused it */
++	if (CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL)
++		ctinfo = IP_CT_RELATED + IP_CT_IS_REPLY;
++	else
++		ctinfo = IP_CT_RELATED;
++
++	/* Attach new skbuff, and increment count */
++	nskb->nfct = &ct->infos[ctinfo];
++	atomic_inc(&ct->ct_general.use);
++}
++
+ static inline int
+ do_kill(const struct ip_conntrack_tuple_hash *i,
+ 	int (*kill)(const struct ip_conntrack *i, void *data),
+@@ -948,20 +950,6 @@
+ 		/* Time to push up daises... */
+ 		if (del_timer(&h->ctrack->timeout))
+ 			death_by_timeout((unsigned long)h->ctrack);
+-		else if (!(h->ctrack->status & IPS_CONFIRMED)) {
+-			/* Unconfirmed connection.  Clean from lists,
+-			   mark confirmed so it gets cleaned as soon
+-			   as skb freed. */
+-			WRITE_LOCK(&ip_conntrack_lock);
+-			/* Lock protects race against another setting
+-                           of confirmed bit.  set_bit isolates this
+-                           bit from the others. */
+-			if (!(h->ctrack->status & IPS_CONFIRMED)) {
+-				clean_from_lists(h->ctrack);
+-				set_bit(IPS_CONFIRMED_BIT, &h->ctrack->status);
+-			}
+-			WRITE_UNLOCK(&ip_conntrack_lock);
+-		}
+ 		/* ... else the timer will get him soon. */
+ 
+ 		ip_conntrack_put(h->ctrack);
+@@ -1057,6 +1045,12 @@
+ #ifdef CONFIG_SYSCTL
+ 	unregister_sysctl_table(ip_conntrack_sysctl_header);
+ #endif
++	ip_ct_attach = NULL;
++	/* This makes sure all current packets have passed through
++           netfilter framework.  Roll on, two-stage module
++           delete... */
++	br_write_lock_bh(BR_NETPROTO_LOCK);
++	br_write_unlock_bh(BR_NETPROTO_LOCK);
+  
+  i_see_dead_people:
+ 	ip_ct_selective_cleanup(kill_all, NULL);
+@@ -1070,6 +1064,9 @@
+ 	nf_unregister_sockopt(&so_getorigdst);
+ }
+ 
++static int hashsize = 0;
++MODULE_PARM(hashsize, "i");
++
+ int __init ip_conntrack_init(void)
+ {
+ 	unsigned int i;
+@@ -1077,9 +1074,17 @@
+ 
+ 	/* Idea from tcp.c: use 1/16384 of memory.  On i386: 32MB
+ 	 * machine has 256 buckets.  1GB machine has 8192 buckets. */
+-	ip_conntrack_htable_size
+-		= (((num_physpages << PAGE_SHIFT) / 16384)
+-		   / sizeof(struct list_head));
++  	if (hashsize) {
++  		ip_conntrack_htable_size = hashsize;
++  	} else {
++ 		ip_conntrack_htable_size
++ 			= (((num_physpages << PAGE_SHIFT) / 16384)
++ 			   / sizeof(struct list_head));
++ 		if (num_physpages > (1024 * 1024 * 1024 / PAGE_SIZE))
++ 			ip_conntrack_htable_size = 8192;
++ 		if (ip_conntrack_htable_size < 16)
++ 			ip_conntrack_htable_size = 16;
++ 	}
+ 	ip_conntrack_max = 8 * ip_conntrack_htable_size;
+ 
+ 	printk("ip_conntrack (%u buckets, %d max)\n",
+@@ -1131,5 +1136,7 @@
+ 	}
+ #endif /*CONFIG_SYSCTL*/
+ 
++	/* For use by ipt_REJECT */
++	ip_ct_attach = ip_conntrack_attach;
+ 	return ret;
+ }
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_ftp.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_ftp.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_ftp.c	Tue Apr 24 16:34:53 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_ftp.c	Tue May  1 13:33:44 2001
+@@ -2,6 +2,7 @@
+ #include <linux/module.h>
+ #include <linux/netfilter.h>
+ #include <linux/ip.h>
++#include <linux/ctype.h>
+ #include <net/checksum.h>
+ #include <net/tcp.h>
+ 
+@@ -12,8 +13,15 @@
+ DECLARE_LOCK(ip_ftp_lock);
+ struct module *ip_conntrack_ftp = THIS_MODULE;
+ 
+-#define SERVER_STRING "227 Entering Passive Mode ("
+-#define CLIENT_STRING "PORT "
++#define MAX_PORTS 8
++static int ports[MAX_PORTS];
++static int ports_c;
++#ifdef MODULE_PARM
++MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
++#endif
++
++static int loose = 0;
++MODULE_PARM(loose, "i");
+ 
+ #if 0
+ #define DEBUGP printk
+@@ -21,32 +29,63 @@
+ #define DEBUGP(format, args...)
+ #endif
+ 
+-static struct {
++static int try_rfc959(const char *, size_t, u_int32_t [], char);
++static int try_eprt(const char *, size_t, u_int32_t [], char);
++static int try_espv_response(const char *, size_t, u_int32_t [], char);
++
++static struct ftp_search {
++	enum ip_conntrack_dir dir;
+ 	const char *pattern;
+ 	size_t plen;
++	char skip;
+ 	char term;
+-} search[2] = {
+-	[IP_CT_FTP_PORT] { CLIENT_STRING, sizeof(CLIENT_STRING) - 1, '\r' },
+-	[IP_CT_FTP_PASV] { SERVER_STRING, sizeof(SERVER_STRING) - 1, ')' }
++	enum ip_ct_ftp_type ftptype;
++	int (*getnum)(const char *, size_t, u_int32_t[], char);
++} search[] = {
++	{
++		IP_CT_DIR_ORIGINAL,
++		"PORT",	sizeof("PORT") - 1, ' ', '\r',
++		IP_CT_FTP_PORT,
++		try_rfc959,
++	},
++	{
++		IP_CT_DIR_REPLY,
++		"227 ",	sizeof("227 ") - 1, '(', ')',
++		IP_CT_FTP_PASV,
++		try_rfc959,
++	},
++	{
++		IP_CT_DIR_ORIGINAL,
++		"EPRT", sizeof("EPRT") - 1, ' ', '\r',
++		IP_CT_FTP_EPRT,
++		try_eprt,
++	},
++	{
++		IP_CT_DIR_REPLY,
++		"229 ", sizeof("229 ") - 1, '(', ')',
++		IP_CT_FTP_EPSV,
++		try_espv_response,
++	},
+ };
+ 
+-/* Returns 0, or length of numbers */
+-static int try_number(const char *data, size_t dlen, u_int32_t array[6],
+-		      char term)
++static int try_number(const char *data, size_t dlen, u_int32_t array[],
++		      int array_size, char sep, char term)
+ {
+ 	u_int32_t i, len;
+ 
++	memset(array, 0, sizeof(array[0])*array_size);
++
+ 	/* Keep data pointing at next char. */
+-	for (i = 0, len = 0; len < dlen; len++, data++) {
++	for (i = 0, len = 0; len < dlen && i < array_size; len++, data++) {
+ 		if (*data >= '0' && *data <= '9') {
+ 			array[i] = array[i]*10 + *data - '0';
+ 		}
+-		else if (*data == ',')
++		else if (*data == sep)
+ 			i++;
+ 		else {
+ 			/* Unexpected character; true if it's the
+ 			   terminator and we're finished. */
+-			if (*data == term && i == 5)
++			if (*data == term && i == array_size - 1)
+ 				return len;
+ 
+ 			DEBUGP("Char %u (got %u nums) `%u' unexpected\n",
+@@ -54,22 +93,100 @@
+ 			return 0;
+ 		}
+ 	}
++	DEBUGP("Failed to fill %u numbers separated by %c\n", array_size, sep);
+ 
+ 	return 0;
+ }
+ 
++/* Returns 0, or length of numbers: 192,168,1,1,5,6 */
++static int try_rfc959(const char *data, size_t dlen, u_int32_t array[6],
++		       char term)
++{
++	return try_number(data, dlen, array, 6, ',', term);
++}
++
++/* Grab port: number up to delimiter */
++static int get_port(const char *data, int start, size_t dlen, char delim,
++		    u_int32_t array[2])
++{
++	u_int16_t port = 0;
++	int i;
++
++	for (i = start; i < dlen; i++) {
++		/* Finished? */
++		if (data[i] == delim) {
++			if (port == 0)
++				break;
++			array[0] = port >> 8;
++			array[1] = port;
++			return i + 1;
++		}
++		else if (data[i] >= '0' && data[i] <= '9')
++			port = port*10 + data[i] - '0';
++		else /* Some other crap */
++			break;
++	}
++	return 0;
++}
++
++/* Returns 0, or length of numbers: |1|132.235.1.2|6275| */
++static int try_eprt(const char *data, size_t dlen, u_int32_t array[6],
++		    char term)
++{
++	char delim;
++	int length;
++
++	/* First character is delimiter, then "1" for IPv4, then
++           delimiter again. */
++	if (dlen <= 3) return 0;
++	delim = data[0];
++	if (isdigit(delim) || delim < 33 || delim > 126
++	    || data[1] != '1' || data[2] != delim)
++		return 0;
++
++	DEBUGP("EPRT: Got |1|!\n");
++	/* Now we have IP address. */
++	length = try_number(data + 3, dlen - 3, array, 4, '.', delim);
++	if (length == 0)
++		return 0;
++
++	DEBUGP("EPRT: Got IP address!\n");
++	/* Start offset includes initial "|1|", and trailing delimiter */
++	return get_port(data, 3 + length + 1, dlen, delim, array+4);
++}
++
++/* Returns 0, or length of numbers: |||6446| */
++static int try_espv_response(const char *data, size_t dlen, u_int32_t array[6],
++			     char term)
++{
++	char delim;
++
++	/* Three delimiters. */
++	if (dlen <= 3) return 0;
++	delim = data[0];
++	if (isdigit(delim) || delim < 33 || delim > 126
++	    || data[1] != delim || data[2] != delim)
++		return 0;
++
++	return get_port(data, 3, dlen, delim, array+4);
++}
++
+ /* Return 1 for match, 0 for accept, -1 for partial. */
+ static int find_pattern(const char *data, size_t dlen,
+ 			const char *pattern, size_t plen,
+-			char term,
++			char skip, char term,
+ 			unsigned int *numoff,
+ 			unsigned int *numlen,
+-			u_int32_t array[6])
++			u_int32_t array[6],
++			int (*getnum)(const char *, size_t, u_int32_t[], char))
+ {
++	size_t i;
++
++	DEBUGP("find_pattern `%s': dlen = %u\n", pattern, dlen);
+ 	if (dlen == 0)
+ 		return 0;
+ 
+-	if (dlen < plen) {
++	if (dlen <= plen) {
+ 		/* Short packet: try for partial? */
+ 		if (strnicmp(data, pattern, dlen) == 0)
+ 			return -1;
+@@ -90,11 +207,23 @@
+ 		return 0;
+ 	}
+ 
+-	*numoff = plen;
+-	*numlen = try_number(data + plen, dlen - plen, array, term);
++	DEBUGP("Pattern matches!\n");
++	/* Now we've found the constant string, try to skip
++	   to the 'skip' character */
++	for (i = plen; data[i] != skip; i++)
++		if (i == dlen - 1) return -1;
++
++	/* Skip over the last character */
++	i++;
++
++	DEBUGP("Skipped up to `%c'!\n", skip);
++
++	*numoff = i;
++	*numlen = getnum(data + i, dlen - i, array, term);
+ 	if (!*numlen)
+ 		return -1;
+ 
++	DEBUGP("Match succeeded!\n");
+ 	return 1;
+ }
+ 
+@@ -115,6 +244,8 @@
+ 	unsigned int matchlen, matchoff;
+ 	struct ip_conntrack_tuple t, mask;
+ 	struct ip_ct_ftp *info = &ct->help.ct_ftp_info;
++	unsigned int i;
++	int found = 0;
+ 
+ 	/* Until there's been traffic both ways, don't look in packets. */
+ 	if (ctinfo != IP_CT_ESTABLISHED
+@@ -163,25 +294,38 @@
+ 		return NF_ACCEPT;
+ 	}
+ 
+-	switch (find_pattern(data, datalen,
+-			     search[dir].pattern,
+-			     search[dir].plen, search[dir].term,
+-			     &matchoff, &matchlen,
+-			     array)) {
+-	case -1: /* partial */
++	/* Initialize IP array to expected address (it's not mentioned
++           in EPSV responses) */
++	array[0] = (ntohl(ct->tuplehash[dir].tuple.src.ip) >> 24) & 0xFF;
++	array[1] = (ntohl(ct->tuplehash[dir].tuple.src.ip) >> 16) & 0xFF;
++	array[2] = (ntohl(ct->tuplehash[dir].tuple.src.ip) >> 8) & 0xFF;
++	array[3] = ntohl(ct->tuplehash[dir].tuple.src.ip) & 0xFF;
++
++	for (i = 0; i < sizeof(search) / sizeof(search[0]); i++) {
++		if (search[i].dir != dir) continue;
++
++		found = find_pattern(data, datalen,
++				     search[i].pattern,
++				     search[i].plen,
++				     search[i].skip,
++				     search[i].term,
++				     &matchoff, &matchlen,
++				     array,
++				     search[i].getnum);
++		if (found) break;
++	}
++	if (found == -1) {
+ 		/* We don't usually drop packets.  After all, this is
+ 		   connection tracking, not packet filtering.
+ 		   However, it is neccessary for accurate tracking in
+ 		   this case. */
+ 		if (net_ratelimit())
+-			printk("conntrack_ftp: partial %u+%u\n",
++			printk("conntrack_ftp: partial %s %u+%u\n",
++			       search[i].pattern,
+ 			       ntohl(tcph->seq), datalen);
+ 		return NF_DROP;
+-
+-	case 0: /* no match */
+-		DEBUGP("ip_conntrack_ftp_help: no match\n");
++	} else if (found == 0) /* No match */
+ 		return NF_ACCEPT;
+-	}
+ 
+ 	DEBUGP("conntrack_ftp: match `%.*s' (%u bytes at %u)\n",
+ 	       (int)matchlen, data + matchoff,
+@@ -194,7 +338,7 @@
+ 		info->is_ftp = 1;
+ 		info->seq = ntohl(tcph->seq) + matchoff;
+ 		info->len = matchlen;
+-		info->ftptype = dir;
++		info->ftptype = search[i].ftptype;
+ 		info->port = array[4] << 8 | array[5];
+ 	} else {
+ 		/* Enrico Scholz's passive FTP to partially RNAT'd ftp
+@@ -204,6 +348,12 @@
+ 		DEBUGP("conntrack_ftp: NOT RECORDING: %u,%u,%u,%u != %u.%u.%u.%u\n",
+ 		       array[0], array[1], array[2], array[3],
+ 		       NIPQUAD(ct->tuplehash[dir].tuple.src.ip));
++
++		/* Thanks to Cristiano Lincoln Mattos
++		   <lincoln@cesar.org.br> for reporting this potential
++		   problem (DMZ machines opening holes to internal
++		   networks, or the packet filter itself). */
++		if (!loose) goto out;
+ 	}
+ 
+ 	t = ((struct ip_conntrack_tuple)
+@@ -218,27 +368,52 @@
+ 		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
+ 	/* Ignore failure; should only happen with NAT */
+ 	ip_conntrack_expect_related(ct, &t, &mask, NULL);
++ out:
+ 	UNLOCK_BH(&ip_ftp_lock);
+ 
+ 	return NF_ACCEPT;
+ }
+ 
+-static struct ip_conntrack_helper ftp = { { NULL, NULL },
+-					  { { 0, { __constant_htons(21) } },
+-					    { 0, { 0 }, IPPROTO_TCP } },
+-					  { { 0, { 0xFFFF } },
+-					    { 0, { 0 }, 0xFFFF } },
+-					  help };
++static struct ip_conntrack_helper ftp[MAX_PORTS];
+ 
+-static int __init init(void)
++/* Not __exit: called from init() */
++static void fini(void)
+ {
+-	return ip_conntrack_helper_register(&ftp);
++	int i;
++	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
++		DEBUGP("ip_ct_ftp: unregistering helper for port %d\n",
++				ports[i]);
++		ip_conntrack_helper_unregister(&ftp[i]);
++	}
+ }
+ 
+-static void __exit fini(void)
++static int __init init(void)
+ {
+-	ip_conntrack_helper_unregister(&ftp);
++	int i, ret;
++
++	if (ports[0] == 0)
++		ports[0] = 21;
++
++	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
++		memset(&ftp[i], 0, sizeof(struct ip_conntrack_helper));
++		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
++		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
++		ftp[i].mask.src.u.tcp.port = 0xFFFF;
++		ftp[i].mask.dst.protonum = 0xFFFF;
++		ftp[i].help = help;
++		DEBUGP("ip_ct_ftp: registering helper for port %d\n", 
++				ports[i]);
++		ret = ip_conntrack_helper_register(&ftp[i]);
++
++		if (ret) {
++			fini();
++			return ret;
++		}
++		ports_c++;
++	}
++	return 0;
+ }
++
+ 
+ EXPORT_SYMBOL(ip_ftp_lock);
+ EXPORT_SYMBOL(ip_conntrack_ftp);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_generic.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_generic.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_generic.c	Wed Jun 21 07:32:27 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_generic.c	Tue May  1 13:33:58 2001
+@@ -48,10 +48,10 @@
+ }
+ 
+ /* Called when a new connection for this protocol found. */
+-static unsigned long
++static int
+ new(struct ip_conntrack *conntrack, struct iphdr *iph, size_t len)
+ {
+-	return GENERIC_TIMEOUT;
++	return 1;
+ }
+ 
+ struct ip_conntrack_protocol ip_conntrack_generic_protocol
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_icmp.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_icmp.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_icmp.c	Sat Apr 15 02:37:57 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_icmp.c	Tue May  1 13:33:58 2001
+@@ -72,22 +72,25 @@
+ 		       struct iphdr *iph, size_t len,
+ 		       enum ip_conntrack_info ctinfo)
+ {
+-	/* FIXME: Should keep count of orig - reply packets: if == 0,
+-           destroy --RR */
+-	/* Delete connection immediately on reply: won't actually
+-           vanish as we still have skb */
++	/* Try to delete connection immediately after all replies:
++           won't actually vanish as we still have skb, and del_timer
++           means this will only run once even if count hits zero twice
++           (theoretically possible with SMP) */
+ 	if (CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY) {
+-		if (del_timer(&ct->timeout))
++		if (atomic_dec_and_test(&ct->proto.icmp.count)
++		    && del_timer(&ct->timeout))
+ 			ct->timeout.function((unsigned long)ct);
+-	} else
++	} else {
++		atomic_inc(&ct->proto.icmp.count);
+ 		ip_ct_refresh(ct, ICMP_TIMEOUT);
++	}
+ 
+ 	return NF_ACCEPT;
+ }
+ 
+ /* Called when a new connection for this protocol found. */
+-static unsigned long icmp_new(struct ip_conntrack *conntrack,
+-			      struct iphdr *iph, size_t len)
++static int icmp_new(struct ip_conntrack *conntrack,
++		    struct iphdr *iph, size_t len)
+ {
+ 	static u_int8_t valid_new[]
+ 		= { [ICMP_ECHO] = 1,
+@@ -103,7 +106,8 @@
+ 		DUMP_TUPLE(&conntrack->tuplehash[0].tuple);
+ 		return 0;
+ 	}
+-	return ICMP_TIMEOUT;
++	atomic_set(&conntrack->proto.icmp.count, 0);
++	return 1;
+ }
+ 
+ struct ip_conntrack_protocol ip_conntrack_protocol_icmp
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_tcp.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_tcp.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_tcp.c	Sat Aug  5 06:07:24 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_tcp.c	Tue May  1 13:33:58 2001
+@@ -206,8 +206,8 @@
+ }
+ 
+ /* Called when a new connection for this protocol found. */
+-static unsigned long tcp_new(struct ip_conntrack *conntrack,
+-			     struct iphdr *iph, size_t len)
++static int tcp_new(struct ip_conntrack *conntrack,
++		   struct iphdr *iph, size_t len)
+ {
+ 	enum tcp_conntrack newconntrack;
+ 	struct tcphdr *tcph = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
+@@ -224,7 +224,7 @@
+ 	}
+ 
+ 	conntrack->proto.tcp.state = newconntrack;
+-	return tcp_timeouts[conntrack->proto.tcp.state];
++	return 1;
+ }
+ 
+ struct ip_conntrack_protocol ip_conntrack_protocol_tcp
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_udp.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_udp.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_proto_udp.c	Sat Aug  5 06:07:24 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_proto_udp.c	Tue May  1 13:33:58 2001
+@@ -62,10 +62,10 @@
+ }
+ 
+ /* Called when a new connection for this protocol found. */
+-static unsigned long udp_new(struct ip_conntrack *conntrack,
++static int udp_new(struct ip_conntrack *conntrack,
+ 			     struct iphdr *iph, size_t len)
+ {
+-	return UDP_TIMEOUT;
++	return 1;
+ }
+ 
+ struct ip_conntrack_protocol ip_conntrack_protocol_udp
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_standalone.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_standalone.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_conntrack_standalone.c	Fri Aug 11 05:35:15 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_conntrack_standalone.c	Tue May  1 13:33:58 2001
+@@ -88,8 +88,6 @@
+ 			   proto);
+ 	if (conntrack->status & IPS_ASSURED)
+ 		len += sprintf(buffer + len, "[ASSURED] ");
+-	if (!(conntrack->status & IPS_CONFIRMED))
+-		len += sprintf(buffer + len, "[UNCONFIRMED] ");
+ 	len += sprintf(buffer + len, "use=%u ",
+ 		       atomic_read(&conntrack->ct_general.use));
+ 	len += sprintf(buffer + len, "\n");
+@@ -169,22 +167,8 @@
+ 			       const struct net_device *out,
+ 			       int (*okfn)(struct sk_buff *))
+ {
+-	/* We've seen it coming out the other side: confirm.  Beware
+-           REJECT generating TCP RESET response (IP_CT_REPLY), or ICMP
+-           errors (IP_CT_REPLY + IP_CT_RELATED).  But new expected
+-           connections must be confirmed as well (eg. ftp data,
+-           IP_CT_RELATED). */
+-	if ((*pskb)->nfct) {
+-		struct ip_conntrack *ct
+-			= (struct ip_conntrack *)(*pskb)->nfct->master;
+-		/* ctinfo is the index of the nfct inside the conntrack */
+-		enum ip_conntrack_info ctinfo = (*pskb)->nfct - ct->infos;
+-
+-		if ((ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED)
+-		    && !(ct->status & IPS_CONFIRMED))
+-			ip_conntrack_confirm(ct);
+-	}
+-	return NF_ACCEPT;
++	/* We've seen it coming out the other side: confirm it */
++	return ip_conntrack_confirm(*pskb);
+ }
+ 
+ static unsigned int ip_refrag(unsigned int hooknum,
+@@ -196,7 +180,8 @@
+ 	struct rtable *rt = (struct rtable *)(*pskb)->dst;
+ 
+ 	/* We've seen it coming out the other side: confirm */
+-	ip_confirm(hooknum, pskb, in, out, okfn);
++	if (ip_confirm(hooknum, pskb, in, out, okfn) != NF_ACCEPT)
++		return NF_DROP;
+ 
+ 	/* Local packets are never produced too large for their
+ 	   interface.  We degfragment them at LOCAL_OUT, however,
+@@ -345,3 +330,4 @@
+ EXPORT_SYMBOL(ip_conntrack_expect_related);
+ EXPORT_SYMBOL(ip_conntrack_tuple_taken);
+ EXPORT_SYMBOL(ip_ct_gather_frags);
++EXPORT_SYMBOL(ip_conntrack_htable_size);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_fw_compat.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_fw_compat.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_fw_compat.c	Thu Feb 22 14:25:40 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_fw_compat.c	Tue May  1 13:33:58 2001
+@@ -69,21 +69,6 @@
+ 	return 0;
+ }
+ 
+-static inline void
+-confirm_connection(struct sk_buff *skb)
+-{
+-	if (skb->nfct) {
+-		struct ip_conntrack *ct
+-			= (struct ip_conntrack *)skb->nfct->master;
+-		/* ctinfo is the index of the nfct inside the conntrack */
+-		enum ip_conntrack_info ctinfo = skb->nfct - ct->infos;
+-
+-		if ((ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED)
+-		    && !(ct->status & IPS_CONFIRMED))
+-			ip_conntrack_confirm(ct);
+-	}
+-}
+-
+ static unsigned int
+ fw_in(unsigned int hooknum,
+       struct sk_buff **pskb,
+@@ -136,7 +121,10 @@
+ 						   (struct net_device *)out,
+ 						   (*pskb)->nh.raw, &redirpt,
+ 						   pskb);
+-			confirm_connection(*pskb);
++
++			/* ip_conntrack_confirm return NF_DROP or NF_ACCEPT */
++			if (ip_conntrack_confirm(*pskb) == NF_DROP)
++				ret = FW_BLOCK;
+ 		}
+ 		break;
+ 	}
+@@ -194,8 +182,7 @@
+ 			       const struct net_device *out,
+ 			       int (*okfn)(struct sk_buff *))
+ {
+-	confirm_connection(*pskb);
+-	return NF_ACCEPT;
++	return ip_conntrack_confirm(*pskb);
+ }
+ 
+ extern int ip_fw_ctl(int optval, void *m, unsigned int len);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_nat_core.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_core.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_nat_core.c	Thu Feb  1 15:26:32 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_core.c	Tue May  1 13:33:58 2001
+@@ -12,6 +12,7 @@
+ #include <linux/skbuff.h>
+ #include <linux/netfilter_ipv4.h>
+ #include <linux/brlock.h>
++#include <linux/vmalloc.h>
+ #include <net/checksum.h>
+ #include <net/icmp.h>
+ #include <net/ip.h>
+@@ -34,10 +35,11 @@
+ 
+ DECLARE_RWLOCK(ip_nat_lock);
+ 
+-#define IP_NAT_HTABLE_SIZE 64
++/* Calculated at init based on memory size */
++static unsigned int ip_nat_htable_size;
+ 
+-static struct list_head bysource[IP_NAT_HTABLE_SIZE];
+-static struct list_head byipsproto[IP_NAT_HTABLE_SIZE];
++static struct list_head *bysource;
++static struct list_head *byipsproto;
+ LIST_HEAD(protos);
+ static LIST_HEAD(helpers);
+ 
+@@ -49,14 +51,14 @@
+ {
+ 	/* Modified src and dst, to ensure we don't create two
+            identical streams. */
+-	return (src + dst + proto) % IP_NAT_HTABLE_SIZE;
++	return (src + dst + proto) % ip_nat_htable_size;
+ }
+ 
+ static inline size_t
+ hash_by_src(const struct ip_conntrack_manip *manip, u_int16_t proto)
+ {
+ 	/* Original src, to ensure we map it consistently if poss. */
+-	return (manip->ip + manip->u.all + proto) % IP_NAT_HTABLE_SIZE;
++	return (manip->ip + manip->u.all + proto) % ip_nat_htable_size;
+ }
+ 
+ /* Noone using conntrack by the time this called. */
+@@ -270,6 +272,7 @@
+ 		struct ip_conntrack_tuple tuple;
+ 	} best = { NULL,  0xFFFFFFFF };
+ 	u_int32_t *var_ipp, *other_ipp, saved_ip, orig_dstip;
++	static unsigned int randomness = 0;
+ 
+ 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC) {
+ 		var_ipp = &tuple->src.ip;
+@@ -286,7 +289,8 @@
+ 
+ 	IP_NF_ASSERT(mr->rangesize >= 1);
+ 	for (i = 0; i < mr->rangesize; i++) {
+-		u_int32_t minip, maxip;
++		/* Host order */
++		u_int32_t minip, maxip, j;
+ 
+ 		/* Don't do ranges which are already eliminated. */
+ 		if (mr->range[i].flags & IP_NAT_RANGE_FULL) {
+@@ -294,16 +298,18 @@
+ 		}
+ 
+ 		if (mr->range[i].flags & IP_NAT_RANGE_MAP_IPS) {
+-			minip = mr->range[i].min_ip;
+-			maxip = mr->range[i].max_ip;
++			minip = ntohl(mr->range[i].min_ip);
++			maxip = ntohl(mr->range[i].max_ip);
+ 		} else
+-			minip = maxip = *var_ipp;
++			minip = maxip = ntohl(*var_ipp);
+ 
+-		for (*var_ipp = minip;
+-		     ntohl(*var_ipp) <= ntohl(maxip);
+-		     *var_ipp = htonl(ntohl(*var_ipp) + 1)) {
++		randomness++;
++		for (j = 0; j < maxip - minip + 1; j++) {
+ 			unsigned int score;
+ 
++			*var_ipp = htonl(minip + (randomness + j) 
++					 % (maxip - minip + 1));
++
+ 			/* Reset the other ip in case it was mangled by
+ 			 * do_extra_mangle last time. */
+ 			*other_ipp = saved_ip;
+@@ -780,9 +786,7 @@
+            confused... --RR */
+ 	if (hdr->type == ICMP_REDIRECT) {
+ 		/* Don't care about races here. */
+-		if (info->initialized
+-		    != ((1 << IP_NAT_MANIP_SRC) | (1 << IP_NAT_MANIP_DST))
+-		    || info->num_manips != 0)
++		if (info->num_manips != 0)
+ 			return NF_DROP;
+ 	}
+ 
+@@ -850,60 +854,20 @@
+ 	return NF_ACCEPT;
+ }
+ 
+-int ip_nat_helper_register(struct ip_nat_helper *me)
+-{
+-	int ret = 0;
+-
+-	WRITE_LOCK(&ip_nat_lock);
+-	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
+-		ret = -EBUSY;
+-	else {
+-		list_prepend(&helpers, me);
+-		MOD_INC_USE_COUNT;
+-	}
+-	WRITE_UNLOCK(&ip_nat_lock);
+-
+-	return ret;
+-}
+-
+-static int
+-kill_helper(const struct ip_conntrack *i, void *helper)
+-{
+-	int ret;
+-
+-	READ_LOCK(&ip_nat_lock);
+-	ret = (i->nat.info.helper == helper);
+-	READ_UNLOCK(&ip_nat_lock);
+-
+-	return ret;
+-}
+-
+-void ip_nat_helper_unregister(struct ip_nat_helper *me)
+-{
+-	WRITE_LOCK(&ip_nat_lock);
+-	LIST_DELETE(&helpers, me);
+-	WRITE_UNLOCK(&ip_nat_lock);
+-
+-	/* Someone could be still looking at the helper in a bh. */
+-	br_write_lock_bh(BR_NETPROTO_LOCK);
+-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+-
+-	/* Find anything using it, and umm, kill them.  We can't turn
+-	   them into normal connections: if we've adjusted SYNs, then
+-	   they'll ackstorm.  So we just drop it.  We used to just
+-	   bump module count when a connection existed, but that
+-	   forces admins to gen fake RSTs or bounce box, either of
+-	   which is just a long-winded way of making things
+-	   worse. --RR */
+-	ip_ct_selective_cleanup(kill_helper, me);
+-
+-	MOD_DEC_USE_COUNT;
+-}
+-
+ int __init ip_nat_init(void)
+ {
+ 	size_t i;
+ 
++	/* Leave them the same for the moment. */
++	ip_nat_htable_size = ip_conntrack_htable_size;
++
++	/* One vmalloc for both hash tables */
++	bysource = vmalloc(sizeof(struct list_head) * ip_nat_htable_size*2);
++	if (!bysource) {
++		return -ENOMEM;
++	}
++	byipsproto = bysource + ip_nat_htable_size;
++
+ 	/* Sew in builtin protocols. */
+ 	WRITE_LOCK(&ip_nat_lock);
+ 	list_append(&protos, &ip_nat_protocol_tcp);
+@@ -911,7 +875,7 @@
+ 	list_append(&protos, &ip_nat_protocol_icmp);
+ 	WRITE_UNLOCK(&ip_nat_lock);
+ 
+-	for (i = 0; i < IP_NAT_HTABLE_SIZE; i++) {
++	for (i = 0; i < ip_nat_htable_size; i++) {
+ 		INIT_LIST_HEAD(&bysource[i]);
+ 		INIT_LIST_HEAD(&byipsproto[i]);
+ 	}
+@@ -923,7 +887,15 @@
+ 	return 0;
+ }
+ 
+-void ip_nat_cleanup(void)
++/* Clear NAT section of all conntracks, in case we're loaded again. */
++static int __exit clean_nat(const struct ip_conntrack *i, void *data)
+ {
++	memset((void *)&i->nat, 0, sizeof(i->nat));
++	return 0;
++}
++
++void __exit ip_nat_cleanup(void)
++{
++	ip_ct_selective_cleanup(&clean_nat, NULL);
+ 	ip_conntrack_destroyed = NULL;
+ }
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_nat_ftp.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_ftp.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_nat_ftp.c	Mon Sep 18 04:15:00 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_ftp.c	Tue May  1 13:33:44 2001
+@@ -7,7 +7,6 @@
+ #include <linux/netfilter_ipv4/ip_nat.h>
+ #include <linux/netfilter_ipv4/ip_nat_helper.h>
+ #include <linux/netfilter_ipv4/ip_nat_rule.h>
+-#include <linux/netfilter_ipv4/ip_nat_ftp.h>
+ #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
+ #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
+ 
+@@ -17,6 +16,16 @@
+ #define DEBUGP(format, args...)
+ #endif
+ 
++#define MAX_PORTS 8
++static int ports[MAX_PORTS];
++static int ports_c = 0;
++
++#ifdef MODULE_PARM
++MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
++#endif
++
++DECLARE_LOCK_EXTERN(ip_ftp_lock);
++
+ /* FIXME: Time out? --RR */
+ 
+ static int
+@@ -49,7 +58,8 @@
+ 		return 0;
+ 	}
+ 
+-	if (ftpinfo->ftptype == IP_CT_FTP_PORT) {
++	if (ftpinfo->ftptype == IP_CT_FTP_PORT
++	    || ftpinfo->ftptype == IP_CT_FTP_EPRT) {
+ 		/* PORT command: make connection go to the client. */
+ 		newdstip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
+ 		newsrcip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
+@@ -89,159 +99,88 @@
+ 	return 1;
+ }
+ 
+-/* This is interesting.  We simply use the port given us by the client
+-   or server.  In practice it's extremely unlikely to clash; if it
+-   does, the rule won't be able to get a unique tuple and will drop
+-   the packets. */
+ static int
+-mangle_packet(struct sk_buff **pskb,
+-	      u_int32_t newip,
+-	      u_int16_t port,
+-	      unsigned int matchoff,
+-	      unsigned int matchlen,
+-	      struct ip_nat_ftp_info *this_way,
+-	      struct ip_nat_ftp_info *other_way)
++mangle_rfc959_packet(struct sk_buff **pskb,
++		     u_int32_t newip,
++		     u_int16_t port,
++		     unsigned int matchoff,
++		     unsigned int matchlen,
++		     struct ip_conntrack *ct,
++		     enum ip_conntrack_info ctinfo)
+ {
+-	struct iphdr *iph = (*pskb)->nh.iph;
+-	struct tcphdr *tcph;
+-	unsigned char *data;
+-	unsigned int tcplen, newlen, newtcplen;
+ 	char buffer[sizeof("nnn,nnn,nnn,nnn,nnn,nnn")];
+ 
+ 	MUST_BE_LOCKED(&ip_ftp_lock);
++
+ 	sprintf(buffer, "%u,%u,%u,%u,%u,%u",
+ 		NIPQUAD(newip), port>>8, port&0xFF);
+ 
+-	tcplen = (*pskb)->len - iph->ihl * 4;
+-	newtcplen = tcplen - matchlen + strlen(buffer);
+-	newlen = iph->ihl*4 + newtcplen;
+-
+-	/* So there I am, in the middle of my `netfilter-is-wonderful'
+-	   talk in Sydney, and someone asks `What happens if you try
+-	   to enlarge a 64k packet here?'.  I think I said something
+-	   eloquent like `fuck'. */
+-	if (newlen > 65535) {
+-		if (net_ratelimit())
+-			printk("nat_ftp cheat: %u.%u.%u.%u->%u.%u.%u.%u %u\n",
+-			       NIPQUAD((*pskb)->nh.iph->saddr),
+-			       NIPQUAD((*pskb)->nh.iph->daddr),
+-			       (*pskb)->nh.iph->protocol);
+-		return 0;
+-	}
+-
+-	if (newlen > (*pskb)->len + skb_tailroom(*pskb)) {
+-		struct sk_buff *newskb;
+-		newskb = skb_copy_expand(*pskb, skb_headroom(*pskb),
+-					 newlen - (*pskb)->len,
+-					 GFP_ATOMIC);
+-		if (!newskb) {
+-			DEBUGP("ftp: oom\n");
+-			return 0;
+-		} else {
+-			kfree_skb(*pskb);
+-			*pskb = newskb;
+-			iph = (*pskb)->nh.iph;
+-		}
+-	}
++	DEBUGP("calling ip_nat_mangle_tcp_packet\n");
+ 
+-	tcph = (void *)iph + iph->ihl*4;
+-	data = (void *)tcph + tcph->doff*4;
++	return ip_nat_mangle_tcp_packet(pskb, ct, ctinfo, matchoff, 
++					matchlen, buffer, strlen(buffer));
++}
+ 
+-	DEBUGP("Mapping `%.*s' [%u %u %u] to new `%s' [%u]\n",
+-		 (int)matchlen, data+matchoff,
+-		 data[matchoff], data[matchoff+1],
+-		 matchlen, buffer, strlen(buffer));
++/* |1|132.235.1.2|6275| */
++static int
++mangle_eprt_packet(struct sk_buff **pskb,
++		   u_int32_t newip,
++		   u_int16_t port,
++		   unsigned int matchoff,
++		   unsigned int matchlen,
++		   struct ip_conntrack *ct,
++		   enum ip_conntrack_info ctinfo)
++{
++	char buffer[sizeof("|1|255.255.255.255|65535|")];
+ 
+-	/* SYN adjust.  If it's uninitialized, or this is after last
+-           correction, record it: we don't handle more than one
+-           adjustment in the window, but do deal with common case of a
+-           retransmit. */
+-	if (this_way->syn_offset_before == this_way->syn_offset_after
+-	    || before(this_way->syn_correction_pos, ntohl(tcph->seq))) {
+-		this_way->syn_correction_pos = ntohl(tcph->seq);
+-		this_way->syn_offset_before = this_way->syn_offset_after;
+-		this_way->syn_offset_after = (int32_t)
+-			this_way->syn_offset_before + newlen - (*pskb)->len;
+-	}
++	MUST_BE_LOCKED(&ip_ftp_lock);
+ 
+-	/* Move post-replacement */
+-	memmove(data + matchoff + strlen(buffer),
+-		data + matchoff + matchlen,
+-		(*pskb)->tail - (data + matchoff + matchlen));
+-	memcpy(data + matchoff, buffer, strlen(buffer));
++	sprintf(buffer, "|1|%u.%u.%u.%u|%u|", NIPQUAD(newip), port);
+ 
+-	/* Resize packet. */
+-	if (newlen > (*pskb)->len) {
+-		DEBUGP("ip_nat_ftp: Extending packet by %u to %u bytes\n",
+-		       newlen - (*pskb)->len, newlen);
+-		skb_put(*pskb, newlen - (*pskb)->len);
+-	} else {
+-		DEBUGP("ip_nat_ftp: Shrinking packet from %u to %u bytes\n",
+-		       (*pskb)->len, newlen);
+-		skb_trim(*pskb, newlen);
+-	}
++	DEBUGP("calling ip_nat_mangle_tcp_packet\n");
+ 
+-	/* Fix checksums */
+-	iph->tot_len = htons(newlen);
+-	(*pskb)->csum = csum_partial((char *)tcph + tcph->doff*4,
+-				     newtcplen - tcph->doff*4, 0);
+-	tcph->check = 0;
+-	tcph->check = tcp_v4_check(tcph, newtcplen, iph->saddr, iph->daddr,
+-				   csum_partial((char *)tcph, tcph->doff*4,
+-						(*pskb)->csum));
+-	ip_send_check(iph);
+-	return 1;
++	return ip_nat_mangle_tcp_packet(pskb, ct, ctinfo, matchoff, 
++					matchlen, buffer, strlen(buffer));
+ }
+ 
+-/* Grrr... SACK.  Fuck me even harder.  Don't want to fix it on the
+-   fly, so blow it away. */
+-static void
+-delete_sack(struct sk_buff *skb, struct tcphdr *tcph)
++/* |1|132.235.1.2|6275| */
++static int
++mangle_epsv_packet(struct sk_buff **pskb,
++		   u_int32_t newip,
++		   u_int16_t port,
++		   unsigned int matchoff,
++		   unsigned int matchlen,
++		   struct ip_conntrack *ct,
++		   enum ip_conntrack_info ctinfo)
+ {
+-	unsigned int i;
+-	u_int8_t *opt = (u_int8_t *)tcph;
+-
+-	DEBUGP("Seeking SACKPERM in SYN packet (doff = %u).\n",
+-	       tcph->doff * 4);
+-	for (i = sizeof(struct tcphdr); i < tcph->doff * 4;) {
+-		DEBUGP("%u ", opt[i]);
+-		switch (opt[i]) {
+-		case TCPOPT_NOP:
+-		case TCPOPT_EOL:
+-			i++;
+-			break;
++	char buffer[sizeof("|||65535|")];
+ 
+-		case TCPOPT_SACK_PERM:
+-			goto found_opt;
++	MUST_BE_LOCKED(&ip_ftp_lock);
+ 
+-		default:
+-			/* Worst that can happen: it will take us over. */
+-			i += opt[i+1] ?: 1;
+-		}
+-	}
+-	DEBUGP("\n");
+-	return;
++	sprintf(buffer, "|||%u|", port);
+ 
+- found_opt:
+-	DEBUGP("\n");
+-	DEBUGP("Found SACKPERM at offset %u.\n", i);
++	DEBUGP("calling ip_nat_mangle_tcp_packet\n");
+ 
+-	/* Must be within TCP header, and valid SACK perm. */
+-	if (i + opt[i+1] <= tcph->doff*4 && opt[i+1] == 2) {
+-		/* Replace with NOPs. */
+-		tcph->check
+-			= ip_nat_cheat_check(*((u_int16_t *)(opt + i))^0xFFFF,
+-					     0, tcph->check);
+-		opt[i] = opt[i+1] = 0;
+-	}
+-	else DEBUGP("Something wrong with SACK_PERM.\n");
++	return ip_nat_mangle_tcp_packet(pskb, ct, ctinfo, matchoff, 
++					matchlen, buffer, strlen(buffer));
+ }
+ 
++static int (*mangle[])(struct sk_buff **, u_int32_t, u_int16_t,
++		     unsigned int,
++		     unsigned int,
++		     struct ip_conntrack *,
++		     enum ip_conntrack_info)
++= { [IP_CT_FTP_PORT] mangle_rfc959_packet,
++    [IP_CT_FTP_PASV] mangle_rfc959_packet,
++    [IP_CT_FTP_EPRT] mangle_eprt_packet,
++    [IP_CT_FTP_EPSV] mangle_epsv_packet
++};
++
+ static int ftp_data_fixup(const struct ip_ct_ftp *ct_ftp_info,
+ 			  struct ip_conntrack *ct,
+-			  struct ip_nat_ftp_info *ftp,
+ 			  unsigned int datalen,
+-			  struct sk_buff **pskb)
++			  struct sk_buff **pskb,
++			  enum ip_conntrack_info ctinfo)
+ {
+ 	u_int32_t newip;
+ 	struct iphdr *iph = (*pskb)->nh.iph;
+@@ -261,8 +200,9 @@
+ 
+ 	/* Change address inside packet to match way we're mapping
+ 	   this connection. */
+-	if (ct_ftp_info->ftptype == IP_CT_FTP_PASV) {
+-		/* PASV response: must be where client thinks server
++	if (ct_ftp_info->ftptype == IP_CT_FTP_PASV
++	    || ct_ftp_info->ftptype == IP_CT_FTP_EPSV) {
++		/* PASV/EPSV response: must be where client thinks server
+ 		   is */
+ 		newip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
+ 		/* Expect something from client->server */
+@@ -287,11 +227,9 @@
+ 	if (port == 0)
+ 		return 0;
+ 
+-	if (!mangle_packet(pskb, newip, port,
+-			   ct_ftp_info->seq - ntohl(tcph->seq),
+-			   ct_ftp_info->len,
+-			   &ftp[ct_ftp_info->ftptype],
+-			   &ftp[!ct_ftp_info->ftptype]))
++	if (!mangle[ct_ftp_info->ftptype](pskb, newip, port,
++					  ct_ftp_info->seq - ntohl(tcph->seq),
++					  ct_ftp_info->len, ct, ctinfo))
+ 		return 0;
+ 
+ 	return 1;
+@@ -305,18 +243,15 @@
+ {
+ 	struct iphdr *iph = (*pskb)->nh.iph;
+ 	struct tcphdr *tcph = (void *)iph + iph->ihl*4;
+-	u_int32_t newseq, newack;
+ 	unsigned int datalen;
+ 	int dir;
+ 	int score;
+ 	struct ip_ct_ftp *ct_ftp_info
+ 		= &ct->help.ct_ftp_info;
+-	struct ip_nat_ftp_info *ftp
+-		= &ct->nat.help.ftp_info[0];
+ 
+ 	/* Delete SACK_OK on initial TCP SYNs. */
+ 	if (tcph->syn && !tcph->ack)
+-		delete_sack(*pskb, tcph);
++		ip_nat_delete_sack(*pskb, tcph);
+ 
+ 	/* Only mangle things once: original direction in POST_ROUTING
+ 	   and reply direction on PRE_ROUTING. */
+@@ -353,71 +288,83 @@
+ 			UNLOCK_BH(&ip_ftp_lock);
+ 			return NF_DROP;
+ 		} else if (score == 2) {
+-			if (!ftp_data_fixup(ct_ftp_info, ct, ftp, datalen,
+-					    pskb)) {
++			if (!ftp_data_fixup(ct_ftp_info, ct, datalen,
++					    pskb, ctinfo)) {
+ 				UNLOCK_BH(&ip_ftp_lock);
+ 				return NF_DROP;
+ 			}
+-
+ 			/* skb may have been reallocated */
+ 			iph = (*pskb)->nh.iph;
+ 			tcph = (void *)iph + iph->ihl*4;
+ 		}
+ 	}
+ 
+-	/* Sequence adjust */
+-	if (after(ntohl(tcph->seq), ftp[dir].syn_correction_pos))
+-		newseq = ntohl(tcph->seq) + ftp[dir].syn_offset_after;
+-	else
+-		newseq = ntohl(tcph->seq) + ftp[dir].syn_offset_before;
+-	newseq = htonl(newseq);
+-
+-	/* Ack adjust: other dir sees offset seq numbers */
+-	if (after(ntohl(tcph->ack_seq) - ftp[!dir].syn_offset_before, 
+-		  ftp[!dir].syn_correction_pos))
+-		newack = ntohl(tcph->ack_seq) - ftp[!dir].syn_offset_after;
+-	else
+-		newack = ntohl(tcph->ack_seq) - ftp[!dir].syn_offset_before;
+-	newack = htonl(newack);
+ 	UNLOCK_BH(&ip_ftp_lock);
+ 
+-	tcph->check = ip_nat_cheat_check(~tcph->seq, newseq,
+-					 ip_nat_cheat_check(~tcph->ack_seq,
+-							    newack,
+-							    tcph->check));
+-	tcph->seq = newseq;
+-	tcph->ack_seq = newack;
++	ip_nat_seq_adjust(*pskb, ct, ctinfo);
+ 
+ 	return NF_ACCEPT;
+ }
+ 
+-static struct ip_nat_helper ftp = { { NULL, NULL },
+-				    { { 0, { __constant_htons(21) } },
+-				      { 0, { 0 }, IPPROTO_TCP } },
+-				    { { 0, { 0xFFFF } },
+-				      { 0, { 0 }, 0xFFFF } },
+-				    help, "ftp" };
++static struct ip_nat_helper ftp[MAX_PORTS];
++static char ftp_names[MAX_PORTS][6];
++
+ static struct ip_nat_expect ftp_expect
+ = { { NULL, NULL }, ftp_nat_expected };
+ 
++/* Not __exit: called from init() */
++static void fini(void)
++{
++	int i;
++
++	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
++		DEBUGP("ip_nat_ftp: unregistering port %d\n", ports[i]);
++		ip_nat_helper_unregister(&ftp[i]);
++	}
++
++	ip_nat_expect_unregister(&ftp_expect);
++}
++
+ static int __init init(void)
+ {
+-	int ret;
++	int i, ret;
++	char *tmpname;
+ 
+ 	ret = ip_nat_expect_register(&ftp_expect);
+ 	if (ret == 0) {
+-		ret = ip_nat_helper_register(&ftp);
++		if (ports[0] == 0)
++			ports[0] = 21;
+ 
+-		if (ret != 0)
+-			ip_nat_expect_unregister(&ftp_expect);
++		for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
++
++			memset(&ftp[i], 0, sizeof(struct ip_nat_helper));
++
++			ftp[i].tuple.dst.protonum = IPPROTO_TCP;
++			ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
++			ftp[i].mask.dst.protonum = 0xFFFF;
++			ftp[i].mask.src.u.tcp.port = 0xFFFF;
++			ftp[i].help = help;
++
++			tmpname = &ftp_names[i][0];
++			sprintf(tmpname, "ftp%2.2d", i);
++			ftp[i].name = tmpname;
++
++			DEBUGP("ip_nat_ftp: Trying to register for port %d\n",
++					ports[i]);
++			ret = ip_nat_helper_register(&ftp[i]);
++
++			if (ret) {
++				printk("ip_nat_ftp: error registering helper for port %d\n", ports[i]);
++				fini();
++				return ret;
++			}
++			ports_c++;
++		}
++
++	} else {
++		ip_nat_expect_unregister(&ftp_expect);
+ 	}
+ 	return ret;
+-}
+-
+-static void __exit fini(void)
+-{
+-	ip_nat_helper_unregister(&ftp);
+-	ip_nat_expect_unregister(&ftp_expect);
+ }
+ 
+ module_init(init);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_nat_helper.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_helper.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_nat_helper.c	Thu Jan  1 10:00:00 1970
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_helper.c	Tue May  1 13:33:44 2001
+@@ -0,0 +1,332 @@
++/* ip_nat_mangle.c - generic support functions for NAT helpers 
++ *
++ * (C) 2000 by Harald Welte <laforge@gnumonks.org>
++ *
++ * distributed under the terms of GNU GPL
++ */
++#include <linux/version.h>
++#include <linux/module.h>
++#include <linux/types.h>
++#include <linux/timer.h>
++#include <linux/skbuff.h>
++#include <linux/netfilter_ipv4.h>
++#include <linux/brlock.h>
++#include <net/checksum.h>
++#include <net/icmp.h>
++#include <net/ip.h>
++#include <net/tcp.h>
++
++#define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
++#define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
++
++#include <linux/netfilter_ipv4/ip_nat.h>
++#include <linux/netfilter_ipv4/ip_nat_protocol.h>
++#include <linux/netfilter_ipv4/ip_nat_core.h>
++#include <linux/netfilter_ipv4/ip_nat_helper.h>
++#include <linux/netfilter_ipv4/listhelp.h>
++
++#if 0
++#define DEBUGP printk
++#define DUMP_OFFSET(x)	printk("offset_before=%d, offset_after=%d, correction_pos=%u\n", x->offset_before, x->offset_after, x->correction_pos);
++#else
++#define DEBUGP(format, args...)
++#define DUMP_OFFSET(x)
++#endif
++	
++DECLARE_LOCK(ip_nat_seqofs_lock);
++LIST_HEAD(helpers);
++			 
++static inline int 
++ip_nat_resize_packet(struct sk_buff **skb,
++		     struct ip_conntrack *ct, 
++		     enum ip_conntrack_info ctinfo,
++		     int new_size)
++{
++	struct iphdr *iph;
++	struct tcphdr *tcph;
++	void *data;
++	int dir;
++	struct ip_nat_seq *this_way, *other_way;
++
++	DEBUGP("ip_nat_resize_packet: old_size = %u, new_size = %u\n",
++		(*skb)->len, new_size);
++
++	iph = (*skb)->nh.iph;
++	tcph = (void *)iph + iph->ihl*4;
++	data = (void *)tcph + tcph->doff*4;
++
++	dir = CTINFO2DIR(ctinfo);
++
++	this_way = &ct->nat.info.seq[dir];
++	other_way = &ct->nat.info.seq[!dir];
++
++	if (new_size > (*skb)->len + skb_tailroom(*skb)) {
++		struct sk_buff *newskb;
++		newskb = skb_copy_expand(*skb, skb_headroom(*skb),
++					 new_size - (*skb)->len,
++					 GFP_ATOMIC);
++
++		if (!newskb) {
++			printk("ip_nat_resize_packet: oom\n");
++			return 0;
++		} else {
++			kfree_skb(*skb);
++			*skb = newskb;
++		}
++	}
++
++	iph = (*skb)->nh.iph;
++	tcph = (void *)iph + iph->ihl*4;
++	data = (void *)tcph + tcph->doff*4;
++
++	DEBUGP("ip_nat_resize_packet: Seq_offset before: ");
++	DUMP_OFFSET(this_way);
++
++	LOCK_BH(&ip_nat_seqofs_lock);
++
++	/* SYN adjust. If it's uninitialized, of this is after last 
++	 * correction, record it: we don't handle more than one 
++	 * adjustment in the window, but do deal with common case of a 
++	 * retransmit */
++	if (this_way->offset_before == this_way->offset_after
++	    || before(this_way->correction_pos, ntohl(tcph->seq))) {
++		this_way->correction_pos = ntohl(tcph->seq);
++		this_way->offset_before = this_way->offset_after;
++		this_way->offset_after = (int32_t)
++			this_way->offset_before + new_size - (*skb)->len;
++	}
++
++	UNLOCK_BH(&ip_nat_seqofs_lock);
++
++	DEBUGP("ip_nat_resize_packet: Seq_offset after: ");
++	DUMP_OFFSET(this_way);
++	
++	return 1;
++}
++
++
++/* Generic function for mangling variable-length address changes inside
++ * NATed connections (like the PORT XXX,XXX,XXX,XXX,XXX,XXX command in FTP).
++ *
++ * Takes care about all the nasty sequence number changes, checksumming,
++ * skb enlargement, ...
++ *
++ * */
++int 
++ip_nat_mangle_tcp_packet(struct sk_buff **skb,
++			 struct ip_conntrack *ct,
++			 enum ip_conntrack_info ctinfo,
++			 unsigned int match_offset,
++			 unsigned int match_len,
++			 char *rep_buffer,
++			 unsigned int rep_len)
++{
++	struct iphdr *iph = (*skb)->nh.iph;
++	struct tcphdr *tcph;
++	unsigned char *data;
++	u_int32_t tcplen, newlen, newtcplen;
++
++	tcplen = (*skb)->len - iph->ihl*4;
++	newtcplen = tcplen - match_len + rep_len;
++	newlen = iph->ihl*4 + newtcplen;
++
++	if (newlen > 65535) {
++		if (net_ratelimit())
++			printk("ip_nat_mangle_tcp_packet: nat'ed packet "
++				"exceeds maximum packet size\n");
++		return 0;
++	}
++
++	if ((*skb)->len != newlen) {
++		if (!ip_nat_resize_packet(skb, ct, ctinfo, newlen)) {
++			printk("resize_packet failed!!\n");
++			return 0;
++		}
++	}
++
++	/* skb may be copied !! */
++	iph = (*skb)->nh.iph;
++	tcph = (void *)iph + iph->ihl*4;
++	data = (void *)tcph + tcph->doff*4;
++
++	/* move post-replacement */
++	memmove(data + match_offset + rep_len,
++		 data + match_offset + match_len,
++		 (*skb)->tail - (data + match_offset + match_len));
++
++	/* insert data from buffer */
++	memcpy(data + match_offset, rep_buffer, rep_len);
++
++	/* update skb info */
++	if (newlen > (*skb)->len) {
++		DEBUGP("ip_nat_mangle_tcp_packet: Extending packet by "
++			"%u to %u bytes\n", newlen - (*skb)->len, newlen);
++		skb_put(*skb, newlen - (*skb)->len);
++	} else {
++		DEBUGP("ip_nat_mangle_tcp_packet: Shrinking packet from "
++			"%u to %u bytes\n", (*skb)->len, newlen);
++		skb_trim(*skb, newlen);
++	}
++
++	/* fix checksum information */
++
++	iph->tot_len = htons(newlen);
++	(*skb)->csum = csum_partial((char *)tcph + tcph->doff*4,
++				    newtcplen - tcph->doff*4, 0);
++
++	tcph->check = 0;
++	tcph->check = tcp_v4_check(tcph, newtcplen, iph->saddr, iph->daddr,
++				   csum_partial((char *)tcph, tcph->doff*4,
++					   (*skb)->csum));
++	ip_send_check(iph);
++
++	return 1;
++}
++
++/* TCP sequence number adjustment */
++int 
++ip_nat_seq_adjust(struct sk_buff *skb, 
++		  struct ip_conntrack *ct, 
++		  enum ip_conntrack_info ctinfo)
++{
++	struct iphdr *iph;
++	struct tcphdr *tcph;
++	int dir, newseq, newack;
++	struct ip_nat_seq *this_way, *other_way;	
++	
++	iph = skb->nh.iph;
++	tcph = (void *)iph + iph->ihl*4;
++
++	dir = CTINFO2DIR(ctinfo);
++
++	this_way = &ct->nat.info.seq[dir];
++	other_way = &ct->nat.info.seq[!dir];
++	
++	if (after(ntohl(tcph->seq), this_way->correction_pos))
++		newseq = ntohl(tcph->seq) + this_way->offset_after;
++	else
++		newseq = ntohl(tcph->seq) + this_way->offset_before;
++	newseq = htonl(newseq);
++
++	if (after(ntohl(tcph->ack_seq) - other_way->offset_before,
++		  other_way->correction_pos))
++		newack = ntohl(tcph->ack_seq) - other_way->offset_after;
++	else
++		newack = ntohl(tcph->ack_seq) - other_way->offset_before;
++	newack = htonl(newack);
++
++	tcph->check = ip_nat_cheat_check(~tcph->seq, newseq,
++					 ip_nat_cheat_check(~tcph->ack_seq, 
++					 		    newack, 
++							    tcph->check));
++
++	DEBUGP("Adjusting sequence number from %u->%u, ack from %u->%u\n",
++		ntohl(tcph->seq), ntohl(newseq), ntohl(tcph->ack_seq),
++		ntohl(newack));
++
++	tcph->seq = newseq;
++	tcph->ack_seq = newack;
++
++	return 0;
++}
++
++/* Grrr... SACK.  Fuck me even harder.  Don't want to fix it on the
++   fly, so blow it away. */
++void
++ip_nat_delete_sack(struct sk_buff *skb, struct tcphdr *tcph)
++{
++	unsigned int i;
++	u_int8_t *opt = (u_int8_t *)tcph;
++
++	DEBUGP("Seeking SACKPERM in SYN packet (doff = %u).\n",
++	       tcph->doff * 4);
++	for (i = sizeof(struct tcphdr); i < tcph->doff * 4;) {
++		DEBUGP("%u ", opt[i]);
++		switch (opt[i]) {
++		case TCPOPT_NOP:
++		case TCPOPT_EOL:
++			i++;
++			break;
++
++		case TCPOPT_SACK_PERM:
++			goto found_opt;
++
++		default:
++			/* Worst that can happen: it will take us over. */
++			i += opt[i+1] ?: 1;
++		}
++	}
++	DEBUGP("\n");
++	return;
++
++ found_opt:
++	DEBUGP("\n");
++	DEBUGP("Found SACKPERM at offset %u.\n", i);
++
++	/* Must be within TCP header, and valid SACK perm. */
++	if (i + opt[i+1] <= tcph->doff*4 && opt[i+1] == 2) {
++		/* Replace with NOPs. */
++		tcph->check
++			= ip_nat_cheat_check(*((u_int16_t *)(opt + i))^0xFFFF,
++					     0, tcph->check);
++		opt[i] = opt[i+1] = 0;
++	}
++	else DEBUGP("Something wrong with SACK_PERM.\n");
++}
++
++static inline int
++helper_cmp(const struct ip_nat_helper *helper,
++	   const struct ip_conntrack_tuple *tuple)
++{
++	return ip_ct_tuple_mask_cmp(tuple, &helper->tuple, &helper->mask);
++}
++
++int ip_nat_helper_register(struct ip_nat_helper *me)
++{
++	int ret = 0;
++
++	WRITE_LOCK(&ip_nat_lock);
++	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
++		ret = -EBUSY;
++	else {
++		list_prepend(&helpers, me);
++		MOD_INC_USE_COUNT;
++	}
++	WRITE_UNLOCK(&ip_nat_lock);
++
++	return ret;
++}
++
++static int
++kill_helper(const struct ip_conntrack *i, void *helper)
++{
++	int ret;
++
++	READ_LOCK(&ip_nat_lock);
++	ret = (i->nat.info.helper == helper);
++	READ_UNLOCK(&ip_nat_lock);
++
++	return ret;
++}
++
++void ip_nat_helper_unregister(struct ip_nat_helper *me)
++{
++	WRITE_LOCK(&ip_nat_lock);
++	LIST_DELETE(&helpers, me);
++	WRITE_UNLOCK(&ip_nat_lock);
++
++	/* Someone could be still looking at the helper in a bh. */
++	br_write_lock_bh(BR_NETPROTO_LOCK);
++	br_write_unlock_bh(BR_NETPROTO_LOCK);
++
++	/* Find anything using it, and umm, kill them.  We can't turn
++	   them into normal connections: if we've adjusted SYNs, then
++	   they'll ackstorm.  So we just drop it.  We used to just
++	   bump module count when a connection existed, but that
++	   forces admins to gen fake RSTs or bounce box, either of
++	   which is just a long-winded way of making things
++	   worse. --RR */
++	ip_ct_selective_cleanup(kill_helper, me);
++
++	MOD_DEC_USE_COUNT;
++}
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_nat_rule.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_rule.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_nat_rule.c	Fri Aug 11 05:35:15 2000
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_rule.c	Tue May  1 13:33:58 2001
+@@ -173,6 +173,12 @@
+ 		return 0;
+ 	}
+ 
++	/* Only allow these for NAT. */
++	if (strcmp(tablename, "nat") != 0) {
++		DEBUGP("SNAT: wrong table %s\n", tablename);
++		return 0;
++	}
++
+ 	if (hook_mask & ~(1 << NF_IP_POST_ROUTING)) {
+ 		DEBUGP("SNAT: hook mask 0x%x bad\n", hook_mask);
+ 		return 0;
+@@ -199,6 +205,12 @@
+ 					  * (mr->rangesize - 1))))) {
+ 		DEBUGP("DNAT: Target size %u wrong for %u ranges\n",
+ 		       targinfosize, mr->rangesize);
++		return 0;
++	}
++
++	/* Only allow these for NAT. */
++	if (strcmp(tablename, "nat") != 0) {
++		DEBUGP("SNAT: wrong table %s\n", tablename);
+ 		return 0;
+ 	}
+ 
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ip_nat_standalone.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_standalone.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ip_nat_standalone.c	Thu Feb 22 14:25:40 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ip_nat_standalone.c	Tue May  1 13:33:58 2001
+@@ -68,17 +68,21 @@
+ 		(*pskb)->ip_summed = CHECKSUM_NONE;
+ 
+ 	ct = ip_conntrack_get(*pskb, &ctinfo);
+-	/* Can't track?  Maybe out of memory: this would make NAT
+-           unreliable. */
++	/* Can't track?  It's not due to stress, or conntrack would
++	   have dropped it.  Hence it's the user's responsibilty to
++	   packet filter it out, or implement conntrack/NAT for that
++	   protocol. 8) --RR */
+ 	if (!ct) {
+-		if (net_ratelimit())
+-			printk(KERN_DEBUG "NAT: %u dropping untracked packet %p %u %u.%u.%u.%u -> %u.%u.%u.%u\n",
+-			       hooknum,
+-			       *pskb,
+-			       (*pskb)->nh.iph->protocol,
+-			       NIPQUAD((*pskb)->nh.iph->saddr),
+-			       NIPQUAD((*pskb)->nh.iph->daddr));
+-		return NF_DROP;
++		/* Exception: ICMP redirect to new connection (not in
++                   hash table yet).  We must not let this through, in
++                   case we're doing NAT to the same network. */
++		struct iphdr *iph = (*pskb)->nh.iph;
++		struct icmphdr *hdr = (struct icmphdr *)
++			((u_int32_t *)iph + iph->ihl);
++		if (iph->protocol == IPPROTO_ICMP
++		    && hdr->type == ICMP_REDIRECT)
++			return NF_DROP;
++		return NF_ACCEPT;
+ 	}
+ 
+ 	switch (ctinfo) {
+@@ -336,3 +340,6 @@
+ EXPORT_SYMBOL(ip_nat_expect_register);
+ EXPORT_SYMBOL(ip_nat_expect_unregister);
+ EXPORT_SYMBOL(ip_nat_cheat_check);
++EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
++EXPORT_SYMBOL(ip_nat_seq_adjust);
++EXPORT_SYMBOL(ip_nat_delete_sack);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ipt_MASQUERADE.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ipt_MASQUERADE.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ipt_MASQUERADE.c	Thu Feb  1 15:26:32 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ipt_MASQUERADE.c	Tue May  1 13:33:58 2001
+@@ -127,14 +127,32 @@
+ 	return ret;
+ }
+ 
+-int masq_device_event(struct notifier_block *this,
+-		      unsigned long event,
+-		      void *ptr)
++static int masq_device_event(struct notifier_block *this,
++			     unsigned long event,
++			     void *ptr)
+ {
+ 	struct net_device *dev = ptr;
+ 
+-	if (event == NETDEV_DOWN || event == NETDEV_CHANGEADDR) {
+-		/* Device was downed/changed (diald)  Search entire table for
++	if (event == NETDEV_DOWN) {
++		/* Device was downed.  Search entire table for
++		   conntracks which were associated with that device,
++		   and forget them. */
++		IP_NF_ASSERT(dev->ifindex != 0);
++
++		ip_ct_selective_cleanup(device_cmp, (void *)(long)dev->ifindex);
++	}
++
++	return NOTIFY_DONE;
++}
++
++static int masq_inet_event(struct notifier_block *this,
++			   unsigned long event,
++			   void *ptr)
++{
++	struct net_device *dev = ((struct in_ifaddr *)ptr)->ifa_dev->dev;
++
++	if (event == NETDEV_DOWN) {
++		/* IP address was deleted.  Search entire table for
+ 		   conntracks which were associated with that device,
+ 		   and forget them. */
+ 		IP_NF_ASSERT(dev->ifindex != 0);
+@@ -151,6 +169,12 @@
+ 	0
+ };
+ 
++static struct notifier_block masq_inet_notifier = {
++	masq_inet_event,
++	NULL,
++	0
++};
++
+ static struct ipt_target masquerade
+ = { { NULL, NULL }, "MASQUERADE", masquerade_target, masquerade_check, NULL,
+     THIS_MODULE };
+@@ -164,6 +188,8 @@
+ 	if (ret == 0) {
+ 		/* Register for device down reports */
+ 		register_netdevice_notifier(&masq_dev_notifier);
++		/* Register IP address change reports */
++		register_inetaddr_notifier(&masq_inet_notifier);
+ 	}
+ 
+ 	return ret;
+@@ -173,6 +199,7 @@
+ {
+ 	ipt_unregister_target(&masquerade);
+ 	unregister_netdevice_notifier(&masq_dev_notifier);
++	unregister_inetaddr_notifier(&masq_inet_notifier);	
+ }
+ 
+ module_init(init);
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/ipv4/netfilter/ipt_REJECT.c linux-2.4.3-all-fixes/net/ipv4/netfilter/ipt_REJECT.c
+--- linux-2.4.3-official/net/ipv4/netfilter/ipt_REJECT.c	Thu Feb  1 15:26:32 2001
++++ linux-2.4.3-all-fixes/net/ipv4/netfilter/ipt_REJECT.c	Tue May  1 13:33:58 2001
+@@ -20,6 +20,18 @@
+ #define DEBUGP(format, args...)
+ #endif
+ 
++/* If the original packet is part of a connection, but the connection
++   is not confirmed, our manufactured reply will not be associated
++   with it, so we need to do this manually. */
++static void connection_attach(struct sk_buff *new_skb, struct nf_ct_info *nfct)
++{
++	void (*attach)(struct sk_buff *, struct nf_ct_info *);
++
++	/* Avoid module unload race with ip_ct_attach being NULLed out */
++	if (nfct && (attach = ip_ct_attach) != NULL)
++		attach(new_skb, nfct);
++}
++
+ /* Send RST reply */
+ static void send_reset(struct sk_buff *oldskb, int local)
+ {
+@@ -128,6 +140,8 @@
+ 	if (nskb->len > nskb->dst->pmtu)
+ 		goto free_nskb;
+ 
++	connection_attach(nskb, oldskb->nfct);
++
+ 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
+ 		ip_finish_output);
+ 	return;
+@@ -136,6 +150,127 @@
+ 	kfree_skb(nskb);
+ }
+ 
++static void send_unreach(struct sk_buff *skb_in, int code)
++{
++	struct iphdr *iph;
++	struct icmphdr *icmph;
++	struct sk_buff *nskb;
++	u32 saddr;
++	u8 tos;
++	int hh_len, length;
++	struct rtable *rt = (struct rtable*)skb_in->dst;
++	unsigned char *data;
++
++	if (!rt)
++		return;
++
++	/* FIXME: Use sysctl number. --RR */
++	if (!xrlim_allow(&rt->u.dst, 1*HZ))
++		return;
++
++	iph = skb_in->nh.iph;
++
++	/* No replies to physical multicast/broadcast */
++	if (skb_in->pkt_type!=PACKET_HOST)
++		return;
++
++	/* Now check at the protocol level */
++	if (rt->rt_flags&(RTCF_BROADCAST|RTCF_MULTICAST))
++		return;
++
++	/* Only reply to fragment 0. */
++	if (iph->frag_off&htons(IP_OFFSET))
++		return;
++
++	/* If we send an ICMP error to an ICMP error a mess would result.. */
++	if (iph->protocol == IPPROTO_ICMP
++	    && skb_in->tail-(u8*)iph >= sizeof(struct icmphdr)) {
++		icmph = (struct icmphdr *)((char *)iph + (iph->ihl<<2));
++		/* Between echo-reply (0) and timestamp (13),
++		   everything except echo-request (8) is an error.
++		   Also, anything greater than NR_ICMP_TYPES is
++		   unknown, and hence should be treated as an error... */
++		if ((icmph->type < ICMP_TIMESTAMP
++		     && icmph->type != ICMP_ECHOREPLY
++		     && icmph->type != ICMP_ECHO)
++		    || icmph->type > NR_ICMP_TYPES)
++			return;
++	}
++
++	saddr = iph->daddr;
++	if (!(rt->rt_flags & RTCF_LOCAL))
++		saddr = 0;
++
++	tos = (iph->tos & IPTOS_TOS_MASK) | IPTOS_PREC_INTERNETCONTROL;
++
++	if (ip_route_output(&rt, iph->saddr, saddr, RT_TOS(tos), 0))
++		return;
++
++	/* RFC says return as much as we can without exceeding 576 bytes. */
++	length = skb_in->len + sizeof(struct iphdr) + sizeof(struct icmphdr);
++
++	if (length > rt->u.dst.pmtu)
++		length = rt->u.dst.pmtu;
++	if (length > 576)
++		length = 576;
++
++	hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
++
++	nskb = alloc_skb(hh_len+15+length, GFP_ATOMIC);
++	if (!nskb) {
++		ip_rt_put(rt);
++		return;
++	}
++
++	nskb->priority = 0;
++	nskb->dst = &rt->u.dst;
++	skb_reserve(nskb, hh_len);
++
++	/* Set up IP header */
++	iph = nskb->nh.iph
++		= (struct iphdr *)skb_put(nskb, sizeof(struct iphdr));
++	iph->version=4;
++	iph->ihl=5;
++	iph->tos=tos;
++	iph->tot_len = htons(length);
++
++	/* This abbreviates icmp->send->ip_build_xmit->ip_dont_fragment */
++	if (!ipv4_config.no_pmtu_disc
++	    && !(rt->u.dst.mxlock&(1<<RTAX_MTU)))
++		iph->frag_off = htons(IP_DF);
++	else iph->frag_off = 0;
++
++	iph->ttl = MAXTTL;
++	ip_select_ident(iph, &rt->u.dst);
++	iph->protocol=IPPROTO_ICMP;
++	iph->saddr=rt->rt_src;
++	iph->daddr=rt->rt_dst;
++	iph->check=0;
++	iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
++
++	/* Set up ICMP header. */
++	icmph = nskb->h.icmph
++		= (struct icmphdr *)skb_put(nskb, sizeof(struct icmphdr));
++	icmph->type = ICMP_DEST_UNREACH;
++	icmph->code = code;	
++	icmph->un.gateway = 0;
++	icmph->checksum = 0;
++	
++	/* Copy as much of original packet as will fit */
++	data = skb_put(nskb,
++		       length - sizeof(struct iphdr) - sizeof(struct icmphdr));
++	/* FIXME: won't work with nonlinear skbs --RR */
++	memcpy(data, skb_in->nh.iph,
++	       length - sizeof(struct iphdr) - sizeof(struct icmphdr));
++	icmph->checksum = ip_compute_csum((unsigned char *)icmph,
++					  length - sizeof(struct iphdr));
++
++	connection_attach(nskb, skb_in->nfct);
++
++	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
++		ip_finish_output);
++}	
++
+ static unsigned int reject(struct sk_buff **pskb,
+ 			   unsigned int hooknum,
+ 			   const struct net_device *in,
+@@ -145,51 +280,43 @@
+ {
+ 	const struct ipt_reject_info *reject = targinfo;
+ 
++	/* Our naive response construction doesn't deal with IP
++           options, and probably shouldn't try. */
++	if ((*pskb)->nh.iph->ihl<<2 != sizeof(struct iphdr))
++		return NF_DROP;
++
+ 	/* WARNING: This code causes reentry within iptables.
+ 	   This means that the iptables jump stack is now crap.  We
+ 	   must return an absolute verdict. --RR */
+     	switch (reject->with) {
+     	case IPT_ICMP_NET_UNREACHABLE:
+-    		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_NET_UNREACH, 0);
++    		send_unreach(*pskb, ICMP_NET_UNREACH);
+     		break;
+     	case IPT_ICMP_HOST_UNREACHABLE:
+-    		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_HOST_UNREACH, 0);
++    		send_unreach(*pskb, ICMP_HOST_UNREACH);
+     		break;
+     	case IPT_ICMP_PROT_UNREACHABLE:
+-    		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_PROT_UNREACH, 0);
++    		send_unreach(*pskb, ICMP_PROT_UNREACH);
+     		break;
+     	case IPT_ICMP_PORT_UNREACHABLE:
+-    		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
++    		send_unreach(*pskb, ICMP_PORT_UNREACH);
+     		break;
+     	case IPT_ICMP_NET_PROHIBITED:
+-    		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_NET_ANO, 0);
++    		send_unreach(*pskb, ICMP_NET_ANO);
+     		break;
+ 	case IPT_ICMP_HOST_PROHIBITED:
+-    		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_HOST_ANO, 0);
++    		send_unreach(*pskb, ICMP_HOST_ANO);
+     		break;
+-    	case IPT_ICMP_ECHOREPLY:
+-		printk("REJECT: ECHOREPLY no longer supported.\n");
+-		break;
+ 	case IPT_TCP_RESET:
+ 		send_reset(*pskb, hooknum == NF_IP_LOCAL_IN);
+ 		break;
++	case IPT_ICMP_ECHOREPLY:
++		/* Doesn't happen. */
+ 	}
+ 
+ 	return NF_DROP;
+ }
+ 
+-static inline int find_ping_match(const struct ipt_entry_match *m)
+-{
+-	const struct ipt_icmp *icmpinfo = (const struct ipt_icmp *)m->data;
+-
+-	if (strcmp(m->u.kernel.match->name, "icmp") == 0
+-	    && icmpinfo->type == ICMP_ECHO
+-	    && !(icmpinfo->invflags & IPT_ICMP_INV))
+-		return 1;
+-
+-	return 0;
+-}
+-
+ static int check(const char *tablename,
+ 		 const struct ipt_entry *e,
+ 		 void *targinfo,
+@@ -216,17 +343,8 @@
+ 	}
+ 
+ 	if (rejinfo->with == IPT_ICMP_ECHOREPLY) {
+-		/* Must specify that it's an ICMP ping packet. */
+-		if (e->ip.proto != IPPROTO_ICMP
+-		    || (e->ip.invflags & IPT_INV_PROTO)) {
+-			DEBUGP("REJECT: ECHOREPLY illegal for non-icmp\n");
+-			return 0;
+-		}
+-		/* Must contain ICMP match. */
+-		if (IPT_MATCH_ITERATE(e, find_ping_match) == 0) {
+-			DEBUGP("REJECT: ECHOREPLY illegal for non-ping\n");
+-			return 0;
+-		}
++		printk("REJECT: ECHOREPLY no longer supported.\n");
++		return 0;
+ 	} else if (rejinfo->with == IPT_TCP_RESET) {
+ 		/* Must specify that it's a TCP packet */
+ 		if (e->ip.proto != IPPROTO_TCP
+diff -urN -I \$.*\$ -X /tmp/kerndiff.ukBlDe --minimal linux-2.4.3-official/net/netsyms.c linux-2.4.3-all-fixes/net/netsyms.c
+--- linux-2.4.3-official/net/netsyms.c	Wed Apr  4 04:25:42 2001
++++ linux-2.4.3-all-fixes/net/netsyms.c	Tue May  1 13:33:58 2001
+@@ -363,8 +363,6 @@
+ EXPORT_SYMBOL(sysctl_tcp_ecn);
+ EXPORT_SYMBOL(tcp_cwnd_application_limited);
+ 
+-EXPORT_SYMBOL(xrlim_allow);
+-
+ EXPORT_SYMBOL(tcp_write_xmit);
+ 
+ EXPORT_SYMBOL(tcp_v4_remember_stamp); 
+@@ -423,6 +421,7 @@
+ 
+ /* Used by other modules */
+ EXPORT_SYMBOL(in_ntoa);
++EXPORT_SYMBOL(xrlim_allow);
+ 
+ EXPORT_SYMBOL(ip_rcv);
+ EXPORT_SYMBOL(arp_rcv);
+@@ -550,6 +549,7 @@
+ EXPORT_SYMBOL(nf_hooks);
+ EXPORT_SYMBOL(nf_setsockopt);
+ EXPORT_SYMBOL(nf_getsockopt);
++EXPORT_SYMBOL(ip_ct_attach);
+ #endif
+ 
+ EXPORT_SYMBOL(register_gifconf);

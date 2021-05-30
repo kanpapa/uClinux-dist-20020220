@@ -1,0 +1,7 @@
+Author: James Morris <jmorris@intercode.com.au>
+Status: Beta
+
+This patch adds CONFIG_IP_NF_NAT_SNMP_BASIC for basic SNMP NAT
+support.  This is the "basic" form of SNMP-ALG, as described in 
+RFC 2962; it works by modifying IP addresses inside SNMP payloads
+to match IP-layer NAT mapping.

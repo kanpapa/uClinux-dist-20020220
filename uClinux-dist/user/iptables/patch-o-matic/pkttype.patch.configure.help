@@ -1,0 +1,11 @@
+CONFIG_IP_NF_MATCH_MAC
+skb->pkt_type packet match support (EXPERIMENTAL)
+CONFIG_IP_NF_MATCH_PKTTYPE
+  This patch allows you to match packet in accrodance
+  to its "class", eg. BROADCAST, MULTICAST, ...
+  
+  Typical usage:
+  iptables -A INPUT -m pkttype --pkt-type broadcast -j LOG
+  
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.

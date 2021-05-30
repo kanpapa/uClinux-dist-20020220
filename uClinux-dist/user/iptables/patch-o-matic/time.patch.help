@@ -1,0 +1,29 @@
+Author: Fabrice MARIE <fabrice@celestix.com>
+Status: It Works For Me.
+
+This option adds CONFIG_IP_NF_MATCH_TIME, which supplies a time match module.
+This match allows you to filter based on the packet arrival time
+(arrival time at the machine which the netfilter is running on).
+
+Supported options are:
+--timestart HH:MM
+  The starting point of the time match frame.
+
+--timestop HH:MM
+  The stopping point of the time match frame
+
+--days Tue,Mon...
+  Days of the week to match separated by a coma, no space
+  (one of Sun,Mon,Tue,Wed,Thu,Fri,Sat)
+
+Example:
+  -m time --timestart 8:00 --timestop 18:00 --days Mon,Tue,Wed,Thu,Fri
+  will match packets that has a arrival timestamp in the range 8:00->18:00 from Monday
+  to Friday.
+
+TODO:
+  This code does not handle timezone, so be careful !
+  On my box, it seems that I have to give UTC times so that it match properly.
+  A good thing would be to add some sort of timezone conversion support in
+  libiptc_time.c so that the user wouldn't have to compute hours/minutes/days by hand.
+

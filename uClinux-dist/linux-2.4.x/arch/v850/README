@@ -1,0 +1,15 @@
+This port to the NEC v850e processor supports the following platforms:
+
+   + The gdb v850e simulator (CONFIG_SIM); see the subdirectory `sim' for some
+     more support files for this.
+
+   + The Midas labs RTE-V850E/MA1-CB evaluation board (CONFIG_RTE_MA1_CB),
+     with untested support for the RTE-V850E/NB85E-CB board
+     (CONFIG_RTE_NB85E_CB).  This support has only been tested when running
+     with the Multi-debugger monitor ROM (for the Green Hills Multi debugger).
+     The optional RTE-MOTHER-A motherboard is also supported, which
+     allows PCI boards to be used.
+
+Porting to anything with a V850E/MA1 or MA2 processor should be simple.
+See the file <asm-v850/machdep.h> and the files it includes for an example of
+how to add platform/chip-specific support.

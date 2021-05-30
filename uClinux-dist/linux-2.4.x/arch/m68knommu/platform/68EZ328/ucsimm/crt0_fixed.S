@@ -36,6 +36,56 @@ splash_bits:
 	.text
 _start:
 _stext:	movew	#0x2700,%sr
+
+/*****************************************************************************
+ * Setup PLL and wait for it to settle (in 68x328 cpu's).
+ * Also, if enabled, init serial port.
+ *****************************************************************************/
+/* Serial port setup. Should only be needed if debugging this startup code. */
+	movew   #0x0800, 0xfffff906		/* Ignore CTS */
+    movew   #0x010b, 0xfffff902		/* BAUD to 9600 */
+    movew   #0xe100, 0xfffff900		/* enable */
+
+    movew   #0x2400, 0xfffff200		/* PLLCR */
+    movew   #0x0123, 0xfffff202		/* PLLFSR */
+    moveq   #0, %d0
+    movew   #16384, %d0         	/* PLL settle wait loop */
+_pll_settle:
+    subw    #1, %d0
+    bne     _pll_settle
+
+/*****************************************************************************
+ * Init chip registers (uCsimm specific)
+ *****************************************************************************/
+    moveb   #0x00,   0xfffffb0b     /* Watchdog off */
+    moveb   #0x10,   0xfffff000     /* SCR */
+    moveb   #0x00,   0xfffff40b     /* enable chip select */
+    moveb   #0x00,   0xfffff423     /* enable /DWE */
+    moveb   #0x08,   0xfffffd0d     /* disable hardmap */
+    moveb   #0x07,   0xfffffd0f     /* level 7 interrupt clear */
+    movew   #0x8000, 0xfffff100     /* FLASH at 0x10000000 */
+    movew   #0x01ed, 0xfffff110     /* 8Meg, 16bit, enable, 0ws */
+    movew   #0x8f00, 0xfffffc00     /* DRAM configuration */
+    movew   #0x8667, 0xfffffc02     /* DRAM control */
+    movew   #0x0000, 0xfffff106     /* DRAM at 0x00000000 */
+    movew   #0x068d, 0xfffff116     /* 8Meg, 16bit, enable, 0ws */
+    moveb   #0x40,   0xfffff300     /* IVR */
+	movel   #0x007FFFFF, %d0        /* IMR */
+    movel   %d0, 0xfffff304
+    moveb   0xfffff42b, %d0
+    andb    #0xe0, %d0
+    moveb   %d0, 0xfffff42b
+
+/*	moveb	#0x30,	0xFFFFF119      /* emucs init, 3ws */
+/*	moveb	#0x03,	0xFFFFF42B		/* nable clko */
+
+	movew	#0x8000, 0xFFFFF102		/* CSB */
+	movew	#0x0190, 0xFFFFF112		/* disable eth + DPRAM - KH */
+
+/*****************************************************************************
+ * Init LCD controller.
+ * (Assuming that LCD controller is already init'ed when running from RAM)
+ *****************************************************************************/
 #ifdef CONFIG_INIT_LCD
 	movel	#splash_bits, 0xfffffA00 /* LSSA */
 	moveb	#0x28,   0xfffffA05	/* LVPW */
@@ -49,9 +99,11 @@ _stext:	movew	#0x2700,%sr
 	movew	#0xff00, 0xfffff412	/* LCD pins */
 #endif
 	moveal  #__ramend-CONFIG_MEMORY_RESERVE*0x100000 - 0x10, %sp
+/****
 	movew	#32767, %d0  /* PLL settle wait loop */
 1:	subq	#1, %d0
 	bne	1b
+****/
 
 	/* Copy data segment from ROM to RAM */
 	moveal	#__data_rom_start, %a0

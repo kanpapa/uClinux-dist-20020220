@@ -1,0 +1,13 @@
+--- linux/net/ipv4/netfilter/ipt_LOG.c.orig	Mon Jan  1 18:54:07 2001
++++ linux/net/ipv4/netfilter/ipt_LOG.c	Fri Sep 28 11:13:11 2001
+@@ -213,7 +213,7 @@
+ 				printk("[");
+ 				dump_packet(info,
+ 					    (struct iphdr *)(icmph + 1),
+-					    datalen-sizeof(struct iphdr),
++					    datalen-sizeof(struct icmphdr),
+ 					    0);
+ 				printk("] ");
+ 			}
+
+

@@ -1,0 +1,17 @@
+This file contains any messages produced by compilers while
+running configure, to aid debugging if configure makes a mistake.
+
+configure:532: checking for gcc
+configure:645: checking whether the C compiler (gcc  ) works
+configure:661: gcc -o conftest    conftest.c  1>&5
+configure:687: checking whether the C compiler (gcc  ) is a cross-compiler
+configure:692: checking whether we are using GNU C
+configure:720: checking whether gcc accepts -g
+configure:752: checking for POSIXized ISC
+configure:777: checking for pow in -lm
+configure:824: checking for gzopen in -lz
+configure:871: checking for png_create_write_struct in -lpng
+configure:918: checking for jpeg_set_defaults in -ljpeg
+configure:965: checking for TT_Init_FreeType in -lttf
+configure:1013: checking --with-device=?
+configure:1029: checking --with-syslog=?

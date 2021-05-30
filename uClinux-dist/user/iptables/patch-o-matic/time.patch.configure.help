@@ -1,0 +1,12 @@
+CONFIG_IP_NF_MATCH_TOS
+TIME patch support
+CONFIG_IP_NF_MATCH_TIME
+  This option adds a `time' match, which allows you to create rules in
+  any iptables table wich will match packet arrival timestamp
+  (arrival time at the machine which the netfilter is running on).
+
+  If you say Y here, try iptables -m time --help for more information.
+ 
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+

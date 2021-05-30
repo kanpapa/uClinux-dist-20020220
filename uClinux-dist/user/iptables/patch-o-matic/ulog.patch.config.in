@@ -1,0 +1,4 @@
+  dep_tristate '  LOG target support' CONFIG_IP_NF_TARGET_LOG $CONFIG_IP_NF_IPTABLES
+  if [ "$CONFIG_NETLINK" != "n" ]; then
+     dep_tristate '  ULOG target support' CONFIG_IP_NF_TARGET_ULOG $CONFIG_NETLINK $CONFIG_IP_NF_IPTABLES
+  fi

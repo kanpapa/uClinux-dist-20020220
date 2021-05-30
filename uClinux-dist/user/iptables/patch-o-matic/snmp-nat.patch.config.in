@@ -1,0 +1,4 @@
+      dep_tristate '    REDIRECT target support' CONFIG_IP_NF_TARGET_REDIRECT $CONFIG_IP_NF_NAT
+      if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+        dep_tristate '    Basic SNMP-ALG support (EXPERIMENTAL)' CONFIG_IP_NF_NAT_SNMP_BASIC $CONFIG_IP_NF_NAT
+      fi

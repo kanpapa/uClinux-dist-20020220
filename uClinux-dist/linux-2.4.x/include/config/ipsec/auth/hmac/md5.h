@@ -1,0 +1,1 @@
+#define CONFIG_IPSEC_AUTH_HMAC_MD5 1

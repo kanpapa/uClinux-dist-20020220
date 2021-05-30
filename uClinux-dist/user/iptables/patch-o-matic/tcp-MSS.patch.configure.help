@@ -1,0 +1,28 @@
+CONFIG_IP_NF_TARGET_LOG
+TCPMSS target support
+CONFIG_IP_NF_TARGET_TCPMSS
+  This option adds a `TCPMSS' target, which allows you to alter the
+  MSS value of TCP SYN packets, to control the maximum size for that
+  connection (usually limiting it to your outgoing interface's MTU
+  minus 40).
+
+  THIS IS A HACK, used to overcome criminally braindead ISPs or
+  servers which block ICMP Fragmentation Needed packets.  The symptoms
+  of this problem are that everything works fine from your Linux
+  firewall/router, but machines behind it can never exchange large
+  packets:
+	1) Web browsers connect, then hang with no data received.
+	2) Small mail works fine, but large EMails hang.
+	3) ssh works fine, but scp hangs after initial handshaking.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+tcpmss match support
+CONFIG_IP_NF_MATCH_TCPMSS
+  This option adds a `tcpmss' match, which allows you to examine the
+  MSS value of TCP SYN packets, which control the maximum packet size
+  for that connection.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.

@@ -1,0 +1,109 @@
+release 0.4 - initial public release
+
+release 0.5 - added cacheing, removed compiler warning on linux PPC
+
+release 0.6 - TCP handling: close socket and return to connect state if we 
+              can't read the first byte. This corrects a problem seen very 
+              occasionally where dnsmasq would loop using all available CPU.
+
+	      Added a patch from Cris Bailiff <c.bailiff@e-secure.com.au>
+	      to set SO_REUSEADDR on the tcp socket which stops problems when
+              dnsmasq is restarted and old connections still exist.
+
+	      Stopped claiming in doc.html that smail is the default Debian
+	      mailer, since it isn't any longer. (Pointed out by
+	      David Karlin <dkarlin@coloradomtn.edu>)
+
+release 0.7   Create a pidfile at /var/run/dnsmasq.pid
+
+	      Extensive armouring against "poison packets" courtesy of
+              Thomas Moestl <tmoestl@gmx.net>
+
+	      Set sockaddr.sa_family on outgoing address, patch from
+	      David Symonds <xoxus@usa.net>
+
+              Patch to clear cache on SIGHUP 
+	      from Jason L. Wagner <nialscorva@yahoo.com> 
+
+	      Fix bad bug resulting from not initialising value-result	
+	      address-length parameter to recvfrom() and accept() - it
+	      worked by luck before!
+
+release 0.95  Major rewrite: remove calls to gethostbyname() and talk
+              directly to the upstream server(s) instead.
+              This has many advantages.
+              (1) Dnsmasq no longer blocks during long lookups.
+              (2) All query types are handled now, (eg MX) not just internet
+                  address queries. Addresses are cached, all other
+                  queries are forwarded directly.
+              (3) Time-to-live data from upstream server is read and
+                  used by dnsmasq to purge entries from the cache.
+              (4) /etc/hosts is still read and its contents served (unless 
+	          the -h option is given).
+              (5) Dnsmasq can get its upstream servers from
+                  a file other than /etc/resolv.conf (-r option) this allows
+                  dnsmasq to serve names to the machine it is running
+                  on (put nameserver 127.0.0.1 in /etc/resolv.conf and
+                  give dnsmasq the option -r /etc/resolv.dnsmasq)
+              (6) Dnsmasq will re-read it's servers if the
+                  modification time of resolv.conf changes. Along with
+                  4 above this allows nameservers to be set
+		  automatically by ppp or dhcp.	 
+
+              A really clever NAT-like technique allows the daemon to have lots
+              of queries in progress, but still remain very lightweight.
+	      Dnsmasq has a small footprint and normally doesn't allocate
+              any more memory after start-up. The NAT-like forwarding was
+              inspired by a suggestion from Eli Chen <eli@routefree.com>
+
+release 0.96  Fixed embarrasing thinko in cache linked-list code.
+                             
+release 0.98  Some enhancements and bug-fixes. 
+              Thanks to "Denis Carre" <denis.carre@laposte.net> and Martin 
+              Otte <otte@essc.psu.edu>	
+              
+	      (1) Dnsmasq now always sets the IP source address
+                  of its replies correctly. Older versions would not always
+                  do this on multi-homed and IP aliased hosts, which violates 
+                  the RFC.
+              (2) Dnsmasq no longer crashes if a server loop is created
+	          (ie dnsmasq is told to use itself as an upstream server.)
+                  Now it just logs the problem and doesn't use the bad 
+                  server address.
+              (3) Dnsmasq should now forward (but not cache) inverse queries 
+                  and server status queries; this feature has not been tested.
+              (4) Don't write the pid file when in non-daemon mode.
+	      (5) Create the pid file mode 644, rather then 666 (!).
+              (6) Generate queries to upstream nameservers with unpredictable
+                  ids, to thwart DNS spoofers.
+              (7) Dnsmasq no longer forwards queries when the 
+	          "recursion desired" bit is not set in the header.
+	      (8) Fixed getopt code to work on compliers with unsigned char.
+              
+release 0.991 Added -b flag: when set causes dnsmasq to always answer
+	      reverse queries on the RFC 1918 private IP space itself and
+              never forward them to an upstream server. If the name is not in
+	      /etc/hosts, dnsmasq replies with the dotted-quad address.
+              
+              Fixed a bug which stopped dnsmasq working on a box with
+              two or more interfaces with the same IP address. 
+
+              Fixed cacheing of CNAMEs. Previously, a CNAME which pointed
+              to  a name with many A records would not have all the addresses
+              returned when being answered from the cache.
+
+	      Thanks to "Steve Hardy" <s.a.hardy@connectux.com> for his input 
+              on these fixes.
+
+              Fixed race which could cause dnsmasq to miss the second of
+              two closely-spaced updates of resolv.conf (Thanks to Eli Chen
+              for pointing this out.)
+
+	      Fixed a bug which could cause dnsmasq to fail to cache some
+              dns names.
+
+release 0.992 Small change to memory allocation so that names in /etc/hosts
+              don't use cache slots. Also make "-c 0" flag meaningfully 
+              disable caching completely.                            
+
+

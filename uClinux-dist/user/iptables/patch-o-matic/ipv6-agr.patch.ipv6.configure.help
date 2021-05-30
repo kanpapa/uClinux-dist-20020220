@@ -1,0 +1,9 @@
+CONFIG_IP6_NF_MATCH_MAC
+Aggregated address check (EXPERIMENTAL)
+CONFIG_IP6_NF_MATCH_AGR
+  This module is perform checking on the IPv6 IP address
+  Compares the last 64 bits with the aggregated (delivered
+  from the MAC address)
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.

@@ -1,0 +1,2 @@
+  dep_tristate '  MAC address match support' CONFIG_IP_NF_MATCH_MAC $CONFIG_IP_NF_IPTABLES
+  dep_tristate '  Packet type match support (EXPERIMENTAL)' CONFIG_IP_NF_MATCH_PKTTYPE $CONFIG_IP_NF_IPTABLES

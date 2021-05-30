@@ -1,0 +1,14 @@
+CONFIG_IP_NF_FTP
+IRC Send/Chat support
+CONFIG_IP_NF_IRC
+  There is a commonly-used extension to IRC called
+  Direct Client-to-Client Protocol (DCC).  This enables users to send
+  files to each other, and also chat to each other without the need
+  of a server.  DCC Sending is used anywhere you send files over IRC,
+  and DCC Chat is most commonly used by Eggdrop bots.  If you are
+  using NAT, this extension will enable you to send files and initiate
+  chats.  Note that you do NOT need this extension to get files or
+  have others initiate chats, or everything else in IRC.
+
+  If you want to compile it as a module, say 'M' here and read
+  Documentation/modules.txt.  If unsure, say 'N'.

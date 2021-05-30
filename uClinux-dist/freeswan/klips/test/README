@@ -1,0 +1,21 @@
+#
+# RCSID $Id: README,v 1.2 1999/04/06 04:54:31 rgb Exp $
+#
+This directory contains almost obsolete test scripts to excercise many of the
+different combinations of connections that can be formed with IPSec.
+
+The 'ji' sub-directory contains very out-of-date test scripts that are
+here for historical purposes only.
+
+The 100, 103, 105, 110 and west sub-directories contain scripts to be run
+on the sub-directory-named SG (Security Gateway) for interoperating with
+the script-named SG.  Many parameters will have to be customised for
+your site.
+
+#
+# $Log: README,v $
+# Revision 1.2  1999/04/06 04:54:31  rgb
+# Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+# patch shell fixes.
+#
+#

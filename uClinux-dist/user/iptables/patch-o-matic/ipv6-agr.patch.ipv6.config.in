@@ -1,0 +1,4 @@
+  dep_tristate '  netfilter MARK match support' CONFIG_IP6_NF_MATCH_MARK $CONFIG_IP6_NF_IPTABLES
+  if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+    dep_tristate '  Aggregated address check (EXPERIMENTAL)' CONFIG_IP6_NF_MATCH_AGR $CONFIG_IP6_NF_IPTABLES
+  fi

@@ -1,0 +1,28 @@
+Author: Imran Patel <ipatel@crosswinds.net>, shameless adaption from the 
+	IPv4 match written by James Morris <jmorris@intercode.com.au>
+Status: Should Work.
+
+This module is used for matching the total length of an IPv6  
+datagram (including the IPv6 header + extension headers, if any) 
+against a specific value or inclusive range of values.  To specify
+a single value, use the following form:
+
+ --length   followed by an optional `!', then the
+            value, ranging from 0 to 65535 (may also be specified in hex
+            format).
+
+When specifying a range of values, the first value is taken as the
+minimum length and the second value is taken as the maximum length:
+
+ --length  followed by an optional `!', then the
+           values in the form of min:max.  Values may range from 0 to 65535
+           but the minimum value cannot be greater than the maximum value.
+
+Examples:
+
+# ip6tables -A FORWARD -p udp -m length --length 85:0xffff -j DROP
+# iptables -A FORWARD -p udp -m length --length ! :84 -j DROP
+(both do exactly the same thing)
+
+If a range value is missing, its value
+is implied: zero for minimum and 0xffff for maximum.

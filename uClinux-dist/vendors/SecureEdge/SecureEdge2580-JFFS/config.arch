@@ -1,0 +1,48 @@
+.EXPORT_ALL_VARIABLES:
+############################################################################
+#
+# Vendor specific settings
+#
+
+include $(ROOTDIR)/vendors/SecureEdge/SecureEdge2580/config.arch
+
+############################################################################
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all build
+#
+
+UCLINUX_BUILD_SET = 0					# have we set a special config below
+
+############################################################################
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+endif
+
+############################################################################

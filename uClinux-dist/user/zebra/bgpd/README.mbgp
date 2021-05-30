@@ -1,0 +1,68 @@
+
+This version of zebra-0.81 contains a very raw port of MBGP.
+------------------------------------------------------------
+
+I've been mainly interested to get the ball rolling and get a better
+understanding of MBGP and see what capabilities that our Cisco routers
+are implementing.
+
+Overview
+--------
+
+* Compilation with HAVE_MBGPV4 config.h
+* It creates a new IPV4 routing RIB.
+* It creates commands for viewing the routing RIB
+ 
+  show ip mbgp neighbors
+  show ip mbgp regexp <REGEXP>
+  Plus more
+ 
+* safi added to "struct prefix_ipv4" in prefix.h
+* And more.
+
+* Only Multicast uses the Multiprotocol Encoding.
+
+
+
+TEST's
+------
+I've tested this with Cisco's MBGP implementation:
+
+1) EBGP multi-hop lab boxes.
+2) ISP with full Internet unicast + Plus IPV4 multicast RIB.
+   update's and withdraw are tested.
+
+
+CURRENT bgpd.conf 
+-----------------
+
+router bgp MYASN
+ network net/mask
+ network net/mask nlri multicast
+
+ neighbor IP-Address  remote-as ASN nlri unicast multicast
+ neighbor IP-Address version 4+
+
+
+Note!
+ network net/mask annouces to the unicast RIB
+ network net/mask nlri multicast 
+ 
+No network of either form send withdraws to resp. RIB
+
+TODO 
+----
+
+* BGP Capability negotiation fallback
+* Better integration with later zebra releases which seem to have a better 
+  integration of IPV6 capabilities.
+
+* Better handling of the new safi struct member in prefix*
+* Better debugging 
+
+Robert Olsson  <robert.olsson@data.slu.se>
+Swedish University Of Agricultural Sciences
+Computer Dept.
+P.O  Box 7079
+S-750 07 Uppsala 
+Sweden

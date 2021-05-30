@@ -1,0 +1,78 @@
+.TH DNSMASQ 1
+.SH NAME
+dnsmasq \- A cacheing DNS forwarder.
+.SH SYNOPSIS
+.B dnsmasq
+.I [\-bdhv] [\-p port] [\-r resolv.conf] [\-m mxname] [\-c cachesize]
+.SH "DESCRIPTION"
+.BR dnsmasq
+is a lightweight DNS forwarder. 
+It accepts DNS queries and either answers them from a small, local,
+cache or forwards them to a real, recusrsive, DNS server. It loads the
+contents of /etc/hosts into the cache at startup and on receipt of SIGHUP, so that local hostnames
+which do not appear in the global DNS can be resolved.
+.PP
+
+.BR dnsmasq
+is lightweight and easy to configure. It is intended as be run on NAT firewalls and  provide a DNS service to a small LAN.
+.SH OPTIONS
+.TP
+.B \-b
+Bogus private reverse lookups. All reverse lookups for private IP ranges (ie 192.168.x.x, etc)
+are resolved to their own IP address.
+.TP
+.B \-h
+Don't read the hostnames in /etc/hosts.
+.TP
+.B \-d
+Debug mode, don't fork to the background.
+.TP
+.B \-v
+Print the version number.
+.TP
+.B \-p <port>
+Listen on <port> instead of the standard DNS port (53). Useful mainly for
+debugging.
+.TP
+.B \-r <file>
+Read the IP addresses of the upstream nameservers from <file>, instead of
+/etc/resolv.conf. For the format of this file see
+.BR resolv.conf (5) 
+the only lines relevant to dnsmasq are nameserver ones.
+.TP
+.B \-m <mx name>
+Return an mx record named <mx name> pointing to the host on which dnsmasq 
+is running. This is useful for directing mail from systems on a LAN
+to a central server. 
+.TP
+.B \-c <cachesize>
+Set the size of dnsmasq's cache. The default is 300 names. Setting the cache size to zero disables cacheing.
+.SH NOTES
+.B dnsmasq 
+checks the modification time of /etc/resolv.conf (or 
+equivalent if 
+.B \-r
+is used) and re-reads it if it changes. This allows the DNS servers to
+be set dynamically by PPP or DHCP. Absence of /etc/resolv.conf is not an error
+since it may not have been created before a PPP connection exists. Dnsmasq 
+simply keeps checking in case /etc/resolv.conf is created at any time.
+.PP
+In order to configure dnsmasq to act as cache for the host on which it is running, do the following: (1) Put "nameserver 127.0.0.1" in
+.I /etc/resolv.conf
+(2) Put the real nameservers in
+.I /etc/resolv.dnsmasq
+(or similar) and run dnsmasq with the 
+.B \-r /etc/resolv.dnsmasq
+option.
+.SH AUTHOR
+This manual page was written by Simon Kelley <simon@thekelleys.org.uk>.
+.SH FILES
+.IR /etc/resolv.conf (5)
+
+.IR /etc/hosts (5)
+
+.IR /var/run/dnsmasq.pid
+
+
+
+

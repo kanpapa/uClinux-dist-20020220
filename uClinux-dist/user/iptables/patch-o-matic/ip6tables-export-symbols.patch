@@ -1,0 +1,29 @@
+diff -Nru linux-2.4.7-plain/net/ipv6/netfilter/Makefile linux-2.4.7/net/ipv6/netfilter/Makefile
+--- linux-2.4.7-plain/net/ipv6/netfilter/Makefile	Thu Apr 19 18:10:22 2001
++++ linux-2.4.7/net/ipv6/netfilter/Makefile	Mon Jul 30 18:13:42 2001
+@@ -9,7 +9,7 @@
+ 
+ O_TARGET := netfilter.o
+ 
+-export-objs :=
++export-objs := ip6_tables.o
+ 
+ # Link order matters here.
+ obj-$(CONFIG_IP6_NF_IPTABLES) += ip6_tables.o
+diff -Nru linux-2.4.7-plain/net/ipv6/netfilter/ip6_tables.c linux-2.4.7/net/ipv6/netfilter/ip6_tables.c
+--- linux-2.4.7-plain/net/ipv6/netfilter/ip6_tables.c	Tue May 15 05:29:35 2001
++++ linux-2.4.7/net/ipv6/netfilter/ip6_tables.c	Mon Jul 30 18:12:19 2001
+@@ -1791,5 +1791,13 @@
+ #endif
+ }
+ 
++EXPORT_SYMBOL(ip6t_register_table);
++EXPORT_SYMBOL(ip6t_unregister_table);
++EXPORT_SYMBOL(ip6t_do_table);
++EXPORT_SYMBOL(ip6t_register_match);
++EXPORT_SYMBOL(ip6t_unregister_match);
++EXPORT_SYMBOL(ip6t_register_target);
++EXPORT_SYMBOL(ip6t_unregister_target);
++
+ module_init(init);
+ module_exit(fini);

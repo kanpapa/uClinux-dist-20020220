@@ -1,0 +1,6 @@
+Author: Harald Welte <laforge@gnumonks.org>
+Status: Compiles, yet untested
+
+This adds TTL decrementing (and checking/dropping) in case the MIRROR
+target is used in INPUT or PREROUTING chains/hooks.  This is to avoid 
+endless packet loops.

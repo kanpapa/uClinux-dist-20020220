@@ -1,0 +1,1773 @@
+2000-06-13  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf_packet.c (ospf_ls_upd): Initialize lsa by NULL to avoid
+	warning.
+
+2000-06-12  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf_ase.h (ospf_ase_rtrs_register_lsa): Add prototype.
+
+2000-06-12  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.c (ospf_external_lsa_install):  Make sure to register
+	LSA to rtrs_external when replacing AS-external-LSAs in LSDB.
+	Fix core dump.
+
+2000-06-10  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsdb.c (id_to_prefix), (ospf_lsdb_hash_key),
+	(ospf_lsdb_hash_cmp), (ospf_lsdb_new), (ospf_lsdb_iterator),
+	(lsdb_free), (ospf_lsdb_free), (ospf_lsdb_add),	(ospf_lsdb_delete),
+	(find_lsa), (ospf_lsdb_lookup),	(find_by_id),
+	(ospf_lsdb_lookup_by_id), (ospf_lsdb_lookup_by_header):  Functinos
+	removed for migration to new_lsdb.
+
+	* ospf_lsa.c (ospf_summary_lsa_install),
+	(ospf_summary_asbr_lsa_install), (ospf_maxage_lsa_remover),
+	(ospf_lsa_maxage_walker), (ospf_lsa_lookup),
+	(ospf_lsa_lookup_by_id):  Use new_lsdb instead of ospf_lsdb.
+	(count_lsa), (ospf_lsa_count_table), (ospf_lsa_count),
+	(ospf_get_free_id_for_prefix):	Funcitions removed.
+	
+2000-06-09  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_ism.c (ism_interface_down):  Prevent some unneeded DR changes.
+
+	* ospf_packet.c (ospf_db_desc_proc):  Fix memory leak.
+	(ospf_hello):  Always copy router-ID when hello is received.
+
+2000-06-08  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_lsa.h (struct ospf_lsa): Add member of pointer to struct
+	ospf_area.
+
+2000-06-08  Michael Rozhavsky <mike@nbase.co.il>
+
+	* ospf_ase.c (ospf_asbr_route_same):  New function added.
+	This function makes sure external route calculation more 
+	precisely.
+
+2000-06-07  Michael Rozhavsky <mike@nbase.co.il>
+
+	* ospf_ism.c (ism_change_status):  Use ospf_lsa_flush_area for
+	network-LSA deletion instead of using ospf_lsdb_delete.
+	Also cancel network-LSA origination timer.
+
+2000-06-07  Levi Harper  <lharper@kennedytech.com>
+
+	* ospf_interface.c (ospf_if_down): Close read fd when an interface
+	goes down.
+
+2000-06-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf_asbr.c (ospf_external_info_lookup): Add explicit brace for
+	avoid ambiguous else.
+
+	* ospf_flood.c (ospf_external_info_check): Likewise.
+
+2000-06-05  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_nsm.c (nsm_adj_ok):  Fix bug of DR election.
+
+2000-06-04  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_zebra.c (ospf_default_information_originate),
+	(no_ospf_default_information_originate):  New DEFUN added.
+
+2000-06-03  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.h, ospf_asbr.h (external_info):  Struct moved from
+	ospf_lsa.h to ospf_asbr.h.
+
+	* ospf_lsa.c, ospf_asbr.c (ospf_external_info_add),
+	(ospf_external_info_delete):  Function moved from ospf_lsa.c
+	to ospf_asbr.c.
+
+2000-06-03  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_flood.c (ospf_external_info_check):  New function added.
+	(ospf_process_self_orignated_lsa):  Make sure to flush
+	self-originated AS-external-LSA, when router reboot and no longer
+	originate those AS-external-LSA.
+
+2000-06-02  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_network.c (ospf_serv_sock):  Remove SO_DONTROUTE
+	socket option.
+
+	* ospf_packet.c (ospf_write):  Set MSG_DONTROUTE flag for
+	unicast destination packets.
+
+2000-06-02  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsdb.c (new_lsdb_delete):  Delete entry from LSDB only when
+	specified LSA matches.
+
+2000-06-02  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_network.c (ospf_serv_sock):  Set SO_DONTROUTE
+	socket option.
+
+2000-06-01  Akihiro Mizutani  <mizutani@dml.com>
+
+	* ospf_dump.c:  Replace string `Debugging functions\n' with DEBUG_STR.
+	Replace string `OSPF information\n' with OSPF_STR.
+
+2000-06-01  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsdb.[ch]:  Use new_lsdb struct for network-LSA instead of
+	ospf_lsdb.
+
+2000-06-01  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_dump.c (config_debug_ospf_packet), (config_debug_ospf_event),
+	(config_debug_ospf_ism), (config_debug_ospf_nsm),
+	(config_debug_ospf_lsa), (config_debug_ospf_zebra),
+	(term_debug_ospf_packet), (term_debug_ospf_event),
+	(term_debug_ospf_ism), (term_debug_ospf_nsm),
+	(term_debug_ospf_lsa), (term_debug_ospf_zebra):  Repalce debug_ospf_*
+	variable to use for debug option flags.
+	
+	(debug_ospf_packet), (debug_ospf_ism), (debug_ospf_nsm),
+	(debug_ospf_lsa), (debug_ospf_zebra):  Set {config,term}_debug_*
+	flags when vty->node is CONFIG_NODE, otherwise set only term_debug_*
+	flags.
+
+	* ospf_dump.h (CONF_DEBUG_PACKET_ON), (CONF_DEBUG_PACKET_OFF),
+	(TERM_DEBUG_PACKET_ON), (TERM_DEBUG_PACKET_OFF),
+	(CONF_DEBUG_ON), (CONF_DEBUG_OFF), (IS_CONF_DEBUG_OSPF_PACKET),
+	(IS_CONF_DEBUG_OSPF):  New Macro added.
+	
+2000-05-31  Toshiaki Takada  <takada@zebra.org>
+
+	* ospfd.c (clear_ip_ospf_neighbor):  New DEFUN added.
+	Currently this command is used for only debugging.
+
+	* ospf_nsm.c (nsm_change_status):  Make sure thread cancellation
+	for network-LSA when DR has no full neighbors.
+	
+	* ospf_nsm.c (ospf_db_summary_clear):  New function added.
+
+2000-05-30  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsdb.c (new_lsdb_insert):  LSAs are always freed by
+	maxage_lsa_remover when LSA is replaced.
+
+2000-05-25  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_flood.c (ospf_ls_retransmit_delete_nbr_all):  Add argument
+	`struct ospf_area' to remove LSA from Link State retransmission list
+	of neighbor from only one Area.
+
+2000-05-24  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_lsdb.c (ospf_lsdb_add):  Preserve flags field when
+	overriting old LSA with new LSA.
+
+2000-05-24  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_lsa.c (ospf_router_lsa_body_set):  Fix bug of router-LSA
+	size calculation.
+
+2000-05-22  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_route.c (ospf_intra_add_stub):
+	* ospf_spf.h (struct vertex):  Use u_int32_t for distance (cost)
+	value instead of u_int16_t.
+
+2000-05-22  Axel Gerlach <agerlach@datus.datus.com>
+
+	* ospf_ia.c (ospf_ia_network_route):  Fix bug of Inter-area route
+	equal cost path calculation.
+
+2000-05-21  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_ase.c (ospf_ase_calculate_route_delete):  New function added.
+	Make sure, when rotuer route is deleted, related external routes
+	are also deleted.
+
+2000-05-20  Toshiaki Takada  <takada@zebra.org>
+
+	* ospfd.c (ospf_interface_down):  Make sure interface flag is disable
+	and set fd to -1.
+
+2000-05-16  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_asbr.c (ospf_asbr_should_announce), (ospf_asbr_route_remove):
+	Functions removed.
+
+	* ospfd.h (EXTERNAL_INFO):  Macro added.
+	Substitute `ospf_top->external_info[type]' with it.
+
+2000-05-16  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.c (ospf_rtrs_external_remove):  New function added.
+
+2000-05-14  Gleb Natapov <gleb@nbase.co.il>
+
+	* ospf_flood.c (ospf_ls_retransmit_delete_nbr_all)
+	* ospf_lsdb.c (new_lsdb_insert)
+	* ospf_packet.c (ospf_ls_ack):  Fix database synchonization problem.
+
+2000-05-14  Gleb Natapov <gleb@nbase.co.il>
+
+	* ospf_lsa.h (tv_adjust), (tv_ceil), (tv_floor), (int2tv),
+	(tv_add), (tv_sub), (tv_cmp):  Prototype definition added.
+
+	* ospf_nsm.h (ospf_db_summary_delete_all):  Prototype definition added.
+
+2000-05-13  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.[ch] (ospf_lsa):  struct timestamp type is changed from
+	time_t to struct timeval.
+	(tv_adjust), (tv_ceil), (tv_floor), (int2tv), (tv_add),
+	(tv_sub), (tv_cmp):  timeval utillity functions added.
+
+2000-05-12  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.[ch] (ospf_schedule_update_router_lsas):  Delete function.
+	Change to use macro OSPF_LSA_UPDATE_TIMER instead of using
+	this function.
+	router-LSA refresh timer related stuff is re-organized.
+
+2000-05-10  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_interface.c (ospf_vl_set_params):
+	* ospf_packet.c (ospf_check_network_mask):
+	* ospf_spf.[ch] (ospf_spf_next):
+	Remove field address from `struct vertex', and search for peer
+	address of virtual link in function `ospf_vl_set_params' instead.
+
+2000-05-10  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_packet.c (ospf_ls_upd):  Fix some memory leak related LSA.
+
+2000-05-08  Thomas Molkenbur  <tmo@datus.com>
+
+	* ospf_packet.c (ospf_packet_dup):  Replace ospf_steram_copy()
+	with ospf_stream_dup() to fix memory leak.
+
+2000-05-08  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_flood.c (ospf_flood_through_area):  Fix the problem of
+	LSA update without DROther.
+
+2000-05-04  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_spf.c (ospf_vertex_free):  Fix memory leak of SPF calculation.
+
+2000-05-03  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_neighbor.c (ospf_db_summary_add):  Use new_lsdb struct
+	instead linked-list.
+	(ospf_db_summary_count), (ospf_db_summary_isempty):
+	New function added.
+
+	* ospf_lsa.c (ospf_rotuer_lsa):  Re-arrange and divide functions.
+
+2000-05-02  Gleb Natapov  <gleb@nbase.co.il>
+
+	* ospf_lsdb.c (new_lsdb_cleanup):  Fix memory leak.  When LSDB are
+	not needed any more, then free them.
+
+2000-05-02  Toshiaki Takada  <takada@zebra.org>
+
+	* ospfd.c (timers_spf), (no_timers_spf):  New defun added.
+	SPF calculation timers related stuff is rearranged.
+
+	* ospf_spf.c (ospf_spf_calculate_timer_add):  Function removed.
+	SPF timer is scheduled by SPF calculation delay and holdtime
+	configuration variable.
+
+	* ospf_lsa.c (ospf_external_lsa_nexthop_get):  Set AS-external-LSA's
+	forwarding address when nexthop learned by other protocols is
+	in the OSPF domain. 
+
+	* ospf_zebra.c (ospf_redistribute_source_metric_type),
+	(ospf_redistribute_source_type_metric):  Re-arrange DEFUNs and
+	ALIASes.
+
+2000-05-01  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_flood.c (ospf_ls_retransmit_count),
+	(ospf_ls_retransmit_isempty):  New function added.
+
+	(ospf_ls_retransmit_add), (ospf_ls_retransmit_delete),
+	(ospf_ls_retransmit_clear), (ospf_ls_retransmit_lookup),
+	(ospf_ls_retransmit_delete_all), (ospf_ls_retransmit_delete_nbr_all),
+	(ospf_ls_retransmit_add_nbr_all):  Replace these functions to use
+	new_lsdb.
+
+2000-04-29  Toshiaki Takada  <takada@zebra.org>
+
+	* ospfd.c (no_network_area):  Add check Area-ID whether specified
+	Area-ID with prefix matches config.
+
+2000-04-27  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.c (ospf_maxage_lsa_remover): Fix problem of
+	remaining withdrawn routes on zebra.
+
+2000-04-25  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_nsm.c (nsm_kill_nbr), (nsm_ll_down), (nsm_change_status),
+	(ospf_nsm_event):  Fix network-LSA re-origination problem.
+
+2000-04-24  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_nsm.c (ospf_db_desc_timer): Fix bug of segmentation fault
+	with DD retransmission.
+
+	* ospf_nsm.c (nsm_kill_nbr): Fix bug of re-origination when
+	a neighbor disappears.
+
+2000-04-23  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_abr.c (ospf_abr_announce_network_to_area):  Fix bug of
+	summary-LSAs reorigination.  Correctly copy OSPF_LSA_APPROVED
+	flag to new LSA. when summary-LSA is reoriginatd.
+
+	* ospf_flood.c (ospf_flood_through_area):  Fix bug of flooding
+	procedure.  Change the condition of interface selection.
+
+2000-04-21  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.c (ospf_refresher_register_lsa): Fix bug of refresh never
+	occurs.
+
+	* ospfd.c (show_ip_ospf_neighbor_id): New defun added.
+	`show ip ospf neighbor' related commands are re-arranged.
+
+2000-04-20  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_dump.c (debug_ospf_zebra): New defun added.
+	Suppress zebra related debug information.
+
+2000-04-19  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_zebra.c (ospf_distribute_list_update_timer),
+	(ospf_distribute_list_update), (ospf_filter_update):
+	New function added.  Re-organize `distribute-list' router ospf
+	command.
+
+2000-04-13  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_packet.c (ospf_make_ls_upd): Add check for MAX_AGE.
+
+2000-04-14  Michael Rozhavsky  <mike@nbase.co.il>
+
+	* ospf_packet.c (ospf_make_ls_upd): Increment LS age by configured 
+	interface transmit_delay.
+
+2000-04-14  Sira Panduranga Rao  <pandu@euler.ece.iisc.ernet.in>
+
+	* ospf_interface.c (ip_ospf_cost), (no_ip_ospf_cost):
+	Add to schedule router_lsa origination when the interface cost changes.
+
+2000-04-12  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.c (ospf_refresher_register_lsa),
+	(ospf_refresher_unregister_lsa): Fix bug of core dumped.
+
+	* ospfd.c (no_router_ospf): Fix bug of core dumped.
+
+2000-03-29  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_nsm.c (nsm_oneway_received): Fix bug of MS flag unset.
+
+2000-03-29  Michael Rozhavsky <mike@nbase.co.il>
+
+	* ospf_lsa.c (ospf_network_lsa):
+	* ospf_nsm.c (ospf_nsm_event): Fix bug of Network-LSA originated
+	in stub network.
+
+2000-03-28  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_nsm.c (nsm_bad_ls_req), (nsm_seq_number_mismatch),
+	(nsm_oneway_received): Fix bug of NSM state flapping between
+	ExStart and Exchange.
+
+2000-03-28  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_packet.h (strcut ospf_header): Fix the size of ospf_header,
+	change u_int8_t to u_char.
+
+2000-03-27  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_lsa.c (ospf_lsa_checksum): Take care of BIGENDIAN architecture.
+
+2000-03-27  Toshiaki Takada  <takada@zebra.org>
+
+	* ospfd.c (ospf_interface_run): Make sure Address family matches.
+
+2000-03-26  Love <lha@s3.kth.se>
+
+	* ospf_packet.c (ospf_write): Chack result of sendto().
+
+2000-03-26  Sira Panduranga Rao  <pandu@euler.ece.iisc.ernet.in>
+
+	* ospf_nsm.c (nsm_oneway_received): Fix bug of 1-WayReceived in NSM.
+
+2000-03-23  Libor Pechacek  <farco@clnet.cz>
+
+	* ospf_lsa.c (ospf_network_lsa)
+	* ospf_lsdb.c (new_lsdb_insert): Fix bug of accessing to
+	unallocated memory.
+
+2000-03-23  Toshiaki Takada  <takada@zebra.org>
+
+	* ospfd.c (ospf_config_write): Fix bug of duplicate line for
+	`area A.B.C.D authentication'.
+
+2000-03-22  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_debug.c (debug_ospf_lsa), (no_debug_ospf_lsa): Defun added.
+	Suppress all zlog related to LSAs with this config option.
+
+2000-03-21  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf_nsm.c (ospf_nsm_event): Add check for NSM_InactivityTimer.
+
+2000-03-21  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_packet.c (ospf_ls_upd_timer), (ospf_ls_req):
+	Fix bug of memory leak about linklist.
+
+	* ospf_flood.c (ospf_flood_through_area): Likewise.
+
+2000-03-18  Sira Panduranga Rao  <pandu@euler.ece.iisc.ernet.in>
+
+	* ospf_flood.c (ospf_ls_retransmit_lookup): Add checksum comparison
+	to identify LSA uniquely.  This fix routes lost.
+
+2000-03-18  Toshiaki Takada  <takada@zebra.org>
+
+	* ospf_ase.c (ospf_find_asbr_route): Add sanity check with router
+	routing table.
+
+2000-03-17  Alex Zinin  <zinin@amt.ru>
+	
+        * ospf_spf.[ch]: Bug fix.
+        The 2nd stage of Dijkstra could consider one vertex
+        more than once if there is more than one link
+        between the routers, thus adding extra CPU overhead
+        and extra next-hops.
+        Fixed.
+
+2000-03-15  Sira Panduranga Rao  <pandu@euler.ece.iisc.ernet.in>
+
+        * ospf_nsm.c (nsm_inactivity_timer): Changed to call nsm_kill_nbr().
+
+2000-03-14  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_route.c (ospf_route_copy_nexthops): Fix bug of memory leak of
+        ospf_path.  Actually ignore merging ospf_route with completely same 
+        paths.
+
+2000-03-12  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (show_as_external_lsa_detail): fix bug of 
+        external route tag byte order.
+
+2000-03-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsdb.c (ospf_lsdb_insert): New function added.
+
+2000-03-09  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (ospf_external_lsa_install),
+        (ospf_lsa_lookup), (show_ip_ospf_database_all),
+        (show_ip_ospf_database_self_originate): Use struct new_lsdb for
+        LSDB of AS-external-LSAs instead of ospf_lsdb.
+
+        * ospf_lsa.c (ospf_lsa_unique_id): New function added.
+        Use for assigning Unique Link State ID instead of
+        ospf_get_free_id_for_prefix().
+
+2000-03-09  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ase.c (ospf_ase_calculate_timer): Fix bug of segmentation
+        fault reported by George Bonser <george@siteROCK.com>.
+
+2000-03-07  Libor Pechacek  <farco@clnet.cz>
+
+        * ospfd.c (ospf_interface_down): Fix bug of segmentation fault.
+
+2000-03-06  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_route.c (ospf_route_cmp): Change meaning of return values.
+
+2000-03-02  Alex Zinin <zinin@amt.ru>
+        * ospfd.h, ospf_ia.h
+        New Shortcut ABR code. Now area's flag can be configured
+        with Default, Enable, and Disable values.
+        More info will be in the new ver of I-D soon (see IETF web).
+
+2000-02-25  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (ospf_lsa_header_set), (ospf_external_lsa_body_set),
+        (osfp_external_lsa_originate), (ospf_external_lsa_queue),
+        (ospf_external_lsa_originate_from_queue): New function added.
+        (ospf_external_lsa): Function removed.
+
+        * ospf_zebra.c (ospf_zebra_read_ipv4): Originate AS-external-LSA
+        when listen a route from Zebra, instead creating external route.
+
+        * ospf_asbr.c (ospf_asbr_route_add_flood_lsa),
+        (ospf_asbr_route_add_queue_lsa),
+        (ospf_asbr_route_install_lsa), (ospf_asbr_route_add):
+        Functions removed.
+
+        * ospf_ase.c (process_ase_lsa): Function will not be used.
+        (ospf_ase_calculate), (ospf_ase_calculate_route_add),
+        (ospf_ase_calculate_new_route), (ospf_ase_caluculate_asbr_route):
+        process_ase_lsa () is separated to these functions.
+
+        OSPF AS-external-LSA origination is whole re-organized.
+
+2000-02-18  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_ls_upd): Fix bug of OSPF LSA memory leak.
+
+        * ospf_asbr.c (ospf_asbr_route_add_flood_lsa),
+        (ospf_asbr_route_add_queue_lsa): Fix bug of OSPF external route
+        memory leak.
+
+2000-02-12  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_asbr.c (ospf_asbr_route_install_lsa): Re-calculate LSA
+        checksum after change Advertised Router field.
+
+2000-02-09  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_asbr.c (ospf_external_route_lookup): Add new function.
+
+2000-02-08  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (ospf_router_id_get), (ospf_router_id_update),
+        (ospf_router_id_update_timer): Router ID decision algorithm is changed.
+        Router ID is chosen from all of eligible interface addresses even if
+        it is not enable to OSPF.
+
+2000-02-08  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_asbr.c (ospf_asbr_route_add): Function divided to
+        ospf_asbr_route_add_flood_lsa, ospf_asbr_route_add_queue_lsa and
+        ospf_asbr_route_install_lsa.  If Router-ID is not set, then LSA is
+        waited to install to LSDB.
+        `0.0.0.0 adv_router' AS-external-LSA origination bug was fixed.
+
+2000-02-01  Sira Panduranga Rao  <pandu@euler.ece.iisc.ernet.in>
+
+        * ospf_flood.c (ospf_ls_retransmit_lookup): Compare LS seqnum
+        in the ACK before deleting.
+
+        * ospf_packet.c (ospf_hello): Reset the flags after a shutdown
+        and no shutdown of the interface.
+
+2000-01-31  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_ls_req): Send multiple Link State Update
+        packets respond to a Link State Request packet.
+
+        * ospfd.c (show_ip_ospf_neighbor_detail_sub): Show thread state.
+
+        * ospf_interface.c (ospf_vl_new): Crash when backbone area
+        is not configured and set virtual-link to no-backbone area,
+        bug fixed.
+
+2000-01-30  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_neighbor.h (struct ospf_neighbor): Add pointer to last send
+        LS Request LSA.
+
+        * ospf_packet.c (ospf_ls_upd): Comment out LS request list
+        treatment.  That should be done in OSPF flooding procedure.
+
+        * ospf_flood.c (ospf_flood_through_area): Enclose
+        ospf_check_nbr_loding inside if-else close.
+
+2000-01-31  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_make_ls_upd): Fix bug of #LSAs counting.
+
+2000-01-29  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_make_md5_digest): Fix bug of md5 authentication.
+
+2000-01-28  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (show_ip_ospf): Show Number of ASE-LSAs.
+
+2000-01-27  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_packet.c (ospf_make_db_desc): Don't use rm_list for
+        removing LSA from nbr->db_summary.
+
+2000-01-27  Sira Panduranga Rao <pandu@euler.ece.iisc.ernet.in>
+
+        * ospf_packet.c (ospf_ls_upd_send): Set AllSPFRouters to
+        destination when the link is point-to-point.
+        (ospf_ls_ack_send_delayed): Likewise.
+
+2000-01-27  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_flood.c (ospf_ls_request_delete_all): Fix bug of next
+        pointer lookup after the node is freed.
+
+2000-01-26  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_asbr.c (ospf_asbr_route_add): Instead of scanning all AS
+        external route, use ospf_top->external_self.
+
+2000-01-27  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (ospf_forward_address_get): New function added.
+
+        * ospf_asbr.c (ospf_asbr_check_lsas): Originate AS-external-LSA
+        only when it should be replaced.
+
+2000-01-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_flood.c (ospf_ls_retransmit_clear): Delete list node.
+
+        * ospf_lsa.c (ospf_lsa_free): Reduce logging message using
+        ospf_zlog value.
+
+        * ospf_ism.c (ism_change_status): Fix bug of DR -> non DR status
+        change.  Self originated LSA is freed but not deleted from lsdb.
+
+2000-01-24  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_ism.c (ism_interface_down): Don't use router_id for
+        detecting self neighbor structure.  Instead of that compare
+        pointer itself.
+
+        * ospf_neighbor.c (ospf_nbr_free): Cancel all timer when neighbor
+        is deleted.
+        (ospf_nbr_free): Free last send packet.
+
+        * ospf_neighbor.h (struct ospf_neighbor): Remove host strucutre.
+        Instead of that src is introduced.
+
+        * ospf_nsm.h: Enclose macro defenition with do {} while (0).
+
+2000-01-17  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospfd.c: Change part of passive interface implementation.  For
+        passive interface just disabling sending/receiving Hello on the
+        interface.
+
+2000-01-16  Kai Bankett <kai.bankett@vew-telnet.net>
+
+        * ospf_interface.h (OSPF_IF_PASSIVE): Add passive flag.
+        * ospf_interface.c (ospf_if_lookup_by_name): Add new function.
+        * ospf_lsa.c (ospf_router_lsa): Skip passive interface.
+        * ospfd.c (passive_interface): New command passive-interface is
+        added.
+        (ospf_config_write): Print passive interface.
+
+2000-01-15  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.h (crypt_key): New struct added to store
+        multiple cryptographic autheitication keys.
+        (ospf_interface): struct changed.
+
+        * ospf_interface.c: ospf_crypt_key_new, ospf_crypt_key_add,
+        ospf_crypt_key_lookup, ospf_crypt_key_delete: new functions added.
+
+        * ospf_packet.c (ip_ospf_message_digest_key): Changed to store
+        multiple cryptographic authentication keys.
+
+2000-01-14  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.c: DEFUN (if_ospf_*) commands changed name to
+        ip_ospf_* ().
+        Old notation `ospf *' still remains backward compatibility.
+
+1999-12-29  Alex Zinin  <zinin@amt.ru>
+        * ospf_lsa.c: ospf_lsa_more_recent() bug fix
+        * ospf_nsm.c, ospf_packet.c: remove nbr data struct when
+          int goes down, also check DD flags correctly (bug fix)
+
+1999-12-28  Alex Zinin  <zinin@amt.ru>
+        * "redistribute <source> metric-type (1|2) metric <XXX>" added
+
+1999-12-23  Alex Zinin  <zinin@amt.ru>
+        * added RFC1583Compatibility flag
+        * added dynamic interface up/down functionality
+
+1999-11-19  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_neighbor.h (struct ospf_neighbor): Add member state_change
+        for NSM state change statistics.
+
+1999-11-19  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (show_ip_ospf_neighbor_detail),
+        (show_ip_ospf_neighbor_int_detail): DEFUN Added.
+
+1999-11-14  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_asbr.c (ospf_asbr_check_lsas): Add check of
+        lsa->refresh_list.
+
+1999-11-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ia.[ch] (OSPF_EXAMINE_SUMMARIES_ALL): Macro added.
+        This macro is expanded to ospf_examine_summaries ()
+        for SUMMARY_LSA and SUMMARY_LSA_ASBR.
+        (OSPF_EXAMINE_TRANSIT_SUMMARIES_ALL): Macro added.
+        This macro is expanded to ospf_examine_transit_summaries ()
+        for SUMMARY_LSA and SUMMARY_LSA_ASBR.
+
+1999-11-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.[ch] (ospf_find_self_summary_lsa_by_prefix): Changed to
+        macro OSPF_SUMMARY_LSA_SELF_FIND_BY_PREFIX.
+        (ospf_find_self_summary_asbr_lsa_by_prefix): Changed to
+        macro OSPF_SUMMARY_ASBR_LSA_SELF_FIND_BY_PREFIX.
+        (ospf_find_self_external_lsa_by_prefix): Changed to
+        macro OSPF_EXTERNAL_LSA_SELF_FIND_BY_PREFIX.
+
+1999-11-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (ospf_abr_type): ospf_abr_type_cisco, ospf_abr_type_ibm,
+        ospf_abr_type_shortcut and ospf_abr_type_standard DEFUNs are
+        combined.
+        * ospfd.c (no_ospf_abr_type): no_ospf_abr_type_cisco,
+        no_ospf_abr_type_ibm and no_ospf_abr_type_shortcut DEFUNS are
+        combined.
+
+1999-11-10  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_route.c (ospf_lookup_int_by_prefix): Move function to
+        ospf_interface.c and change name to ospf_if_lookup_by_prefix ().
+
+1999-11-01  Alex Zinin <zinin@amt.ru>
+        * ospf_packet.c 
+        some correction to LSU processing
+
+        * ospf_lsa.c ospfd.h 
+        randomize initial LSA refreshment interval
+        and limit the size of LSA-group to 10
+        to let randomization work more effectively.
+
+1999-10-31  Alex Zinin <zinin@amt.ru>
+        * ospf_interface.c 
+        cancel t_network_lsa_self
+        when freeing int structure
+
+        *  ospf_abr.c ospf_asbr.c ospf_flood.c ospf_lsa.c 
+           ospf_lsa.h ospf_lsdb.h ospfd.c ospfd.h
+
+        Summary and ASE LSA refreshment functions
+        added---LSA refreshment is paced to 70 LSAs
+        per sec to avoid link overflow. Refreshment events
+        are further randomized within a 10 sec interval
+        to avoid syncing.
+        
+        Also the sigfault of memcmp() in ospf_lsa_is_different()
+        is fixed.
+
+1999-10-30  Alex Zinin <zinin@amt.ru>
+        * ospf_nsm.c 
+        Fix the bug where MAX_AGE LSAs
+        are included into the DB summary.
+
+        * ospf_interface.c 
+        allocate 2*MTU input buffer instead of just MTU
+        for the cases when the other router mistakenly
+        sends larger packets thus causing fragmentation, etc.
+
+        * ospf_nsm.c
+        in nsm_reset_nbr() lists should be freed
+        not when they are empty.
+
+1999-10-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_zebra.c (ospf_acl_hook): Move OSPF_IS_ASBR and OSPF_IS_ABR
+        check inside of if (ospf_top).
+
+1999-10-29  Alex Zinin <zinin@amt.ru>
+        * ospf_lsa.c ospf_lsdb.c :
+        add assertion in lsa and lsa->data alloc functions,
+        as well as in lsdb_add for new->data
+
+        * ospf_lsdb.c: free hash table correctly
+
+1999-10-28  John Capo <jc@irbs.com>
+
+        * ospf_packet.h (OSPF_PACKET_MAX): Correct MAX packet length
+        calculation
+
+1999-10-27  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * OSPF-TRAP-MIB.txt: New file added. Edited version of RFC1850.
+
+        * OSPF-MIB.txt: New file added.  Edited version of RFC1850.
+
+1999-10-27  Alex Zinin  <zinin@amt.ru>
+        * ospfd, ospf_zebra, ospf_abr
+        "area import-list" command is added.
+        This command allows to filter the inter-area routes
+        injected into an area. Access list hook function
+        extended to invalidate area exp/imp lists.
+
+1999-10-25  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
+
+        * ospfd.c (ospf_interface_run): Enable to detect P2P network
+        on an OSPF interface.
+
+1999-10-19  Jordan Mendelson  <jordy@wserv.com>
+
+        * ospf_lsdb.c (ospf_lsdb_add): Fix bug of crash
+        in ospf_ls_retransmit_lookup ().
+
+1999-10-19  Vladimir B. Grebenschikov <vova@express.ru>
+
+        * ospf_route.c: Workaround about installation of OSPF routes into
+        the zebra daemon.  Add checking of existance routes.  Free
+        ospf_top->old_table if it exists.
+
+1999-10-15  Jordan Mendelson <jordy@wserv.com>
+
+        * Add support for MD5 authentication.
+
+1999-10-12  Alex Zinin  <zinin@amt.ru>
+        * ospfd.c, ospfd.h, ospf_abr.c:
+          a new command "area export-list" was added, it allows
+          the admin. to control which intra-area routes are
+          announced to other areas by the ABR
+
+1999-10-12  Alex Zinin  <zinin@amt.ru>
+        * ospf_asbr.c (ospf_asbr_check_lsas): Fix bug of coredump
+          when "no redistribute" is used after a distribute list
+          denying some networks was used
+
+1999-10-05  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_route.c (ospf_path_dup): New function added.
+
+1999-10-05  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.[ch]: Some of VL related funciton name changed.
+
+1999-09-27  Alex Zinin  <zinin@amt.ru>
+
+        * ospf_zebra.c: Distribute-list functionality added
+
+1999-09-27  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (show_ip_ospf): Fix bug of segmentation fault when no ospf
+        instance exists.
+
+1999-09-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospfd.c (ospf_interface_down): Fix bug of misusing nextnode()
+        instead of node->next.  Reported by Hiroki Ishibashi
+        <ishibasi@dcd.abk.nec.co.jp>.
+
+        * ospf_route.c (show_ip_ospf_route): Add check for ospf is enabled
+        or not.
+
+1999-09-23  Alex Zinin  <zinin@amt.ru>
+
+        * stub area support added
+
+1999-09-23  Alex Zinin  <zinin@amt.ru>
+
+        * fwd_addr in ASE-LSAs is now set correctly
+        * ASE routing changed to check the fwd_addr
+        and skip the route if the addr points to one
+        of our interfaces to avoid loops.
+
+1999-09-22  Alex Zinin  <zinin@amt.ru>
+
+        * ospf_interface:
+        ospf_vls_in_area() added, it returns 
+        the number of VLs configured through the area
+
+        * ospf_interface.c ospf_lsa.c ospf_lsdb.c ospfd.c 
+        honor correct mem alloc
+
+1999-09-22  Alex Zinin  <zinin@amt.ru>
+
+        * memory.[ch]:
+        Some OSPF mem types added,
+        plus more info in "show mem"
+
+1999-09-21  Alex Zinin  <zinin@amt.ru>
+
+        * ospfd.c:
+        "area range substitute" added.
+        It can be used on NAT-enabled (IP-masquarade)
+        routers to announce private networks
+        from an area as public ones into the outside
+        world (not in the RFC, btw :)
+
+1999-09-21  Alex Zinin  <zinin@amt.ru>
+
+        * ospfd.c:
+        "area range suppress" added.
+        This command allows to instruct the router
+        to be silent about specific ranges, i.e.,
+        it is a method of route filtering on area
+        borders
+
+1999-09-21  Alex Zinin  <zinin@amt.ru>
+
+        * ospfd.c VLs removed when "no network area" executed
+
+1999-09-20  Alex Zinin  <zinin@amt.ru>
+
+        * ospf_ase.c bug fix for not-zero fwd_addr 
+        and directly connected routes.
+
+1999-09-20  Yon Uriarte <yon@plannet.de>
+
+        * ospf_packet.c (ospf_make_ls_req): Introduce delta value for
+        checking the length of OSPF packet exceeds MTU or not.
+
+        * ospf_lsa.c (ospf_lsa_different): Apply ntohs for checking
+        l1->data->length.
+
+1999-09-18  Alex Zinin  <zinin@amt.ru>
+
+        * ospf_lsa.c bug fix for ospf_network_lsa() to
+        include itself into the RID list
+
+1999-09-10  Alex Zinin  <zinin@amt.ru>
+
+        * Alternative ABR behaviors IBM/Cisco/Shortcut
+        implemented
+
+1999-09-10  Alex Zinin  <zinin@amt.ru>
+
+        * router and network-LSA origination
+        changed to honor MinLSInterval
+
+1999-09-08  Alex Zinin  <zinin@amt.ru>
+
+        * modified ABR behavior to honor VLs and transit
+          areas
+
+1999-09-07  Alex Zinin  <zinin@amt.ru>
+
+        * completed VL functionality
+
+1999-09-06  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_asbr.c: New file.
+        ospf_asbr.h: New file.
+
+        * ospf_zebra.c (ospf_redistribute_connected): Add redistribute
+        related stuff.
+
+1999-09-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospfd.h (OSPF_FLAG_VIRTUAL_LINK): Change OSPF_FLAG_VEND to
+        OSPF_FLAG_VIRTUAL_LINK for comprehensiveness.
+
+1999-09-03  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_spf.c (ospf_spf_register): Change name from
+        ospf_spf_route_add() to ospf_spf_register().
+        Include "ospfd/ospf_abr.h" for ospf_abr_task() prototype.
+
+1999-09-02  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_lsa.c (ospf_external_lsa_install): Change to update
+        lsa->data rather than install new one, when same id lsa is already
+        installed.
+
+1999-09-01  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_lsa.c (ospf_router_lsa_install): Return lsa value.
+        (ospf_network_lsa_install): Likewise.
+        (ospf_summary_lsa_install): Likewise.
+        (ospf_summary_asbr_lsa_install): Likewise.
+        (ospf_external_lsa_install): Likewise.
+
+        * ospf_spf.c (ospf_spf_calculate): Comment out debug function
+        ospf_rtrs_print().
+
+1999-08-31  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_spf.c (ospf_rtrs_free): Add ospf_spf_calculate() for
+        freeing rtrs.
+
+1999-08-31  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (show_ip_ospf_database_summary),
+        (show_ip_ospf_database_summary_asbr),
+        (show_ip_ospf_database_external): New function added.
+        `show ip ospf database summary',
+        `show ip ospf database asbr-summary'
+        `show ip ospf database external' command can be used.
+
+        * ospf_lsa.c (ospf_lsa_count_table): New function added.
+        (show_ip_ospf_database_all): show nothing if a type of LSA
+        does not exist.
+        
+1999-08-31  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_lsa.c (ospf_maxage_lsa_remover): Preserve next pointer when
+        the node is deleted.
+
+1999-08-31  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_flood.c (ospf_ls_retransmit_lookup): change to return
+        struct ospf_lsa *.
+        (ospf_ls_request_new), (ospf_ls_request_free),
+        (ospf_ls_request_add), (ospf_ls_request_delete),
+        (ospf_ls_request_delete_all), (ospf_ls_request_lookup):
+        New function added.
+
+        * ospf_packet.c (ospf_ls_upd_send_lsa): New function added.
+
+        * ospf_lsa.h (LS_AGE): Slightly change macro definition.
+
+        * ospf_lsa.c (ospf_lsa_more_recent), (ospf_lsa_diffrent):
+        Use LS_AGE macro.
+
+1999-08-30  Alex Zinin <zinin@amt.ru>
+        
+        * ospfd.c
+        fix a bug with area range config write
+        added "show ip ospf" command, it will be enhanced later on
+
+1999-08-30  Alex Zinin <zinin@amt.ru>
+
+        * ospf_lsa.c
+        updated ospf_router_lsa() to honor flags (B-bit)
+
+1999-08-30  Alex Zinin <zinin@amt.ru>
+
+        * ospf_abr.c
+        wrote major functions implementing ABR activity
+
+1999-08-30  Alex Zinin <zinin@amt.ru>
+
+        * ospf_ia.c ospf_route.c ospf_route.h 
+        fixed the bug with ospf_route.origin field.
+        Now it holds pointer to lsa_header
+
+1999-08-30  Alex Zinin <zinin@amt.ru>
+
+        * ospf_flood.c ospf_flood.h:
+        transformed ospf_flood_if_select into ospf_flood_through_area()
+        added new ospf_flood_if_select() and ospf_flood_through_as()
+
+1999-08-30  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_flood.[ch]: New file added.
+
+        * ospf_packet.c (ospf_lsa_flooding),
+        (ospf_lsa_flooding_select_if): functions move to ospf_flood.c
+
+        * ospf_neighbor.c (ospf_put_lsa_on_retransm_list),
+        (ospf_remove_lsa_from_retransm_list),
+        (ospf_nbr_remove_all_lsas_from_retransm_list),
+        (ospf_lsa_remove_from_ls_retransmit):
+        (ospf_lsa_retransmit): functions move to
+        ospf_flood.c, and change function's name:
+
+        ospf_put_lsa_on_retransm_list ()
+          -> ospf_ls_retransmit_add ()
+        ospf_remove_lsa_from_retransm_list ()
+          -> ospf_ls_retransmit_delete ()
+        ospf_nbr_remove_all_lsas_from_retransm_list ()
+          -> ospf_ls_retransmit_clear ()
+        ospf_lsa_remove_from_ls_retransmit ()
+          -> ospf_ls_retransmit_delete_nbr_all ()
+        ospf_lsa_retransmit ()
+          -> ospf_ls_retransmit_add_nbr_all ()
+
+        * ospf_lsa.c (ospf_lsa_lookup_from_list): function move to
+        ospf_flood.c, and change name to ospf_ls_retransmit_lookup ().
+
+1999-08-30  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_neighbor.c (ospf_nbr_lookup_by_addr): Use
+        route_node_lookup() instead of route_node_get().
+
+        * ospf_packet.c (ospf_ls_upd): Temporary comment out (6) check.
+
+1999-08-30  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_route.c (ospf_lookup_int_by_prefix): Add check of
+        oi->address.
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_lsa.c 
+        MaxAge LSA deletion functions added.
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_neighbor.c 
+        ospf_nbr_lookup_by_addr(): added route_unlock_node()
+        when function returns NULL if (rn->info == NULL)
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospfd.c
+        added a hack for area range deletion
+        
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_lsa.h 
+        included lsdb field into struct ospf_lsa, to find
+        LSDB easier when removing MaxAge LSAs.
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_lsa.c ospf_neighbor.c ospf_nsm.c 
+          ospf_packet.c changed to honor new retransmit list
+          management functions
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_neighbor.c , .h added new retransmit list functions.
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * Makefile.in
+        added ospf_ase, ospf_abr, ospf_ia
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_spf.c:
+        - changed ospf_next_hop_calculation() to include interface
+          and nexthop addr for directly connected routers---more informative
+          and solves problem with route installation into the kernel
+        - changed ospf_nexthop_out_if_addr() to support routers, not only
+          transit networks
+        - added ospf_process_stubs();
+
+1999-08-29  Alex Zinin <zinin@amt.ru>
+        * ospf_lsa.c:
+        - changed ospf_router_lsa() to provide correct links
+          for p-t-p interfaces;
+        - changed ospf_summary_lsa_install() to support table
+          of self-originated summary-LSAs;
+        - added ospf_summary_asbr_lsa_install() and ospf_external_lsa_install()
+        - changed ospf_lsa_install() accordingly
+        - changed show_ip_ospf_database_router_links() to support p-t-p
+
+1999-08-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_packet.c (ospf_make_db_desc): Only master can clear more
+        flag.
+
+1999-08-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_packet.c (ospf_read): Add check of IP src address.
+
+1999-08-28  Alex Zinin <zinin@amt.ru>
+        * ospf_neighbor.h
+        added ospf_nbr_lookup_by_routerid()
+
+1999-08-28  Alex Zinin <zinin@amt.ru>
+        * ospfd.h
+        added ABR/ASBR flag definitions and fields;
+        added iflist field to area structure;
+        summary_lsa_self and summary_lsa_asbr_self are changed
+        to be route tables;
+        added ranges field---configured area ranges;
+        A separate Routers RT added;
+        area range config commands and config write added
+
+
+1999-08-28  Alex Zinin <zinin@amt.ru>
+        * ospf_route.c :
+        ospf_route_free()--added code to free the list of paths;
+        The following functions added:
+                ospf_intra_add_router();
+                ospf_intra_add_transit();
+                ospf_intra_add_stub();
+        the last function uses new ospf_int_lookup_by_prefix();
+        show_ip_ospf_route_cmd()--changed to support new RT structure;
+        added ospf_cmp_routes()--general route comparision function;
+        added ospf_route_copy_nexthops() and ospf_route_copy_nexthops_from_vertex()
+        they are used in ASE and IA routing;
+        added ospf_subst_route() and ospf_add_route();
+
+1999-08-28  Alex Zinin <zinin@amt.ru>
+        * ospf_route.h :
+        changed struct ospf_path to include output interface,
+        changed struct ospf_route to support IA and ASE routing.
+        added prototypes of the function used in IA and ASE modules.
+
+1999-08-28  Alex Zinin <zinin@amt.ru>
+        * ospf_lsa.h ospf_lsa.c :
+        added ospf_my_lsa(), an interface independent version of
+        ospf_lsa_is_self_originated(), it will be used in ASE and IA-routing.
+
+1999-08-27  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_interface.c (interface_config_write): Add check for
+        oi->nbr_self.
+
+1999-08-25  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (ospf_lsa_dup): New function added.
+
+        * ospf_packet.c (ospf_write), (ospf_read): Print send/recv
+        interface in debug message.
+
+1999-08-25  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_ls_ack_send): The name is changed from
+        `ospf_ls_ack_send'.
+        (ospf_ls_ack_send_delayed) (ospf_ls_ack_timer): New function added.
+        Delayed Link State Acknowledgment is scheduled by timer.
+
+1999-08-25  Alex Zinin  <zinin@amt.ru>
+
+        * ospf_lsa.c (ospf_router_lsa): Incorrectly included link to
+        a stub network instead of link to a transit network into
+        originated router-LSA, bug fixed.
+
+1999-08-24  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (ospf_update_router_id): New function added.
+
+        * ospf_network.c (ospf_write): Create new socket per transmission.
+        And select outgoing interface whether dst is unicast or multicast.
+
+        * ospf_packet.c: LSA flooding will work.        
+
+1999-08-24  VOP <vop@unity.net>
+
+        * ospf_route.c: Include "sockunion.h"
+
+1999-08-24  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_network.c (ospf_serv_sock_init): Enclose
+        IPTOS_PREC_INTERNETCONTROL setting with #ifdef for OS which does
+        not have the definition.
+
+1999-08-23  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c: Fix bug of DD processing.
+
+1999-08-18  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (show_ip_ospf_database): Show actual `LS age'.
+
+1999-08-17  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.h (OSPF_MAX_LSA): The value of OSPF_MAX_LSA is
+        corrected.  The bug of `mes_lookup' is fixed.  
+        This had been reported by Poul-Henning Kamp <phk@freebsd.org>.
+
+        * ospf_lsa.c (ospf_router_lsa_install): The name is changed from
+        `ospf_add_router_lsa'.
+        (ospf_network_lsa_install): The name is changed from
+        `ospf_add_network_lsa'.
+
+        * ospf_interface.h (ospf_interface): Add member `nbr_self'.
+
+        * ospf_interface.c (ospf_if_is_enable): New function added.
+
+1999-08-16  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.h (struct lsa_header): The name is changed from
+        `struct ospf_lsa'.
+        (struct ospf_lsa): New struct added to control each LSA's aging
+        and timers.     
+
+        * ospf_lsa.c (ospf_lsa_data_free): The name is change from
+        `ospf_lsa_free'.
+        (ospf_lsa_data_new), (ospf_lsa_new), (ospf_lsa_free),
+        (ospf_lsa_different), (ospf_lsa_install): New function added.
+
+        * ospf_packet.c (ospf_ls_upd_list_lsa): New function added.
+
+1999-08-12  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_nsm.c (nsm_reset_nbr): New function added.
+        KillNbr and LLDown neighbor event call this function.
+        
+1999-08-10  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_ls_retransmit)
+        (ospf_ls_upd_timer): New function added.
+        Set retransmission timer for Link State Update.
+
+1999-07-29  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.c (ospf_dr_election): Fix bug of DR election.
+
+1999-07-28  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_network.c (ospf_serv_sock_init): Set IP precedence field
+        with IPTOS_PREC_INTERNET_CONTROL.
+
+        * ospf_nsm.c (nsm_change_status): Schedule NeighborChange event
+        if NSM status change.
+        
+        * ospf_packet.c (ospf_make_hello): Never include a neighbor in
+        Hello packet, when the neighbor goes down.
+
+1999-07-26  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * Makefile.am (noinst_HEADERS): Add ospf_route.h.
+
+        * ospf_route.c (show_ip_ospf_route): Add `show ip ospf route'
+        command.
+
+1999-07-25  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (ospf_router_lsa): Fix bug of LS sequence number
+        assignement.
+
+1999-07-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_route.c (ospf_route_table_free): New function added.
+
+        * ospf_spf.c (ospf_spf_next): Free vertex w when cw's and w's
+        distance is same.
+
+        * ospfd.h (struct ospf): Add old_table.
+
+        * ospf_main.c (sighup): Call of log_rotate () removed.
+
+        * ospf_lsa.c (ospf_lsa_is_self_originated): Fix bug of checking
+        area->lsa as self LSA.  This should be area->lsa_self.
+
+1999-07-24  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_zebra.c (ospf_zebra_add): ospf_zebra_add
+        (),ospf_zebra_delete () added.
+
+        * ospf_spf.c (ospf_spf_calculate): Call ospf_intra_route_add ().
+
+1999-07-24  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c: Change LS sequence number treatment.
+        (ospf_lsa_is_self_originated): New function added.
+        (show_ip_ospf_database_self_originated): New DEFUN added.
+        
+1999-07-23  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_interface.c (ospf_if_lookup_by_addr): Add loopback check.
+
+1999-07-22  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_spf.c (ospf_nexthop_new), (ospf_nexthop_free),
+        (ospf_nexthop_dup): function added.
+        (ospf_nexthop_calculation): function changed.
+
+        * ospf_interface.c (ospf_if_lookup_by_addr): function added.
+        
+1999-07-21  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_spf.c (ospf_spf_closest_vertex): function removed.
+        
+1999-07-21  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_spf.c (ospf_spf_next): Apply ntohs for fetching metric.
+
+1999-07-21  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_neighbor.c (ospf_nbr_lookup_by_router_id): fundtion removed.
+
+        * ospf_lsa.c (show_ip_ospf_database_router): describe each
+        connected link.
+
+1999-07-21  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_spf.c (ospf_spf_next): V is router LSA or network LSA so
+        change behavior according to LSA type.
+        (ospf_lsa_has_link): Link check function is added.
+
+1999-07-20  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_spf.c (ospf_spf_calculate_schedule): Add new function for
+        SPF calcultion schedule addtition.
+        (ospf_spf_calculate_timer_add): Rough 30 sec interval SPF calc
+        timer is added.
+        (ospf_spf_next_router): Delete ospf_spf_next_network ().
+
+        * ospf_lsa.c (show_ip_ospf_database_all): Network-LSA display
+        header typo correction.  Display of router LSA's #link added.
+
+1999-07-19  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_check_network_mask): Added new function for
+        receiving Raw IP packet on an appropriate interface.
+
+1999-07-16  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c (ospf_router_id): new DEFUN added.
+
+1999-07-15  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_spf.c (ospf_spf_init), (ospf_spf_free),
+        (ospf_spf_has_vertex), (ospf_vertex_lookup),
+        (ospf_spf_next_router), (ospf_spf_next_network),
+        (ospf_spf_closest_vertex), (ospf_spf_calculate):
+        function added.
+
+1999-07-13  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.c: fix bug of DR Election.
+
+        * ospf_nsm.c: fix bug of adjacency forming.
+
+1999-07-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospfd.c (ospf_init): Change to use install_default.
+
+1999-07-01  Rick Payne <rickp@rossfell.co.uk>
+
+        * ospf_zebra.c (zebra_init): Install standard commands to
+        ZEBRA_NODE.
+
+1999-06-30  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_dump.c: Whole debug command is improved.
+        (ISM|NSM) (events|status|timers) debug option added.
+        (show_debugging_ospf): new DEFUN added.
+
+1999-06-30  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_lsa.c (ospf_lsa_lookup_from_list): Change !IPV4_ADDR_CMP to
+        IPV4_ADDR_SAME.
+
+1999-06-29  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_dump.c (ospf_summary_lsa_dump): Add summary-LSA dump routine.
+        (ospf_as_external_lsa_dump): Add AS-external-LSA dump routine.
+
+        * ospf_nsm.c (nsm_twoway_received): fix condtion of adjacnet.
+
+        * ospf_ism.c (ospf_dr_election): fix DR Election.
+        
+        * ospf_dump.c (ospf_nbr_state_message): fix `show ip ospf neighbor'
+        command's state.
+
+1999-06-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_dump.c (ospf_router_lsa_dump): Add router-LSA dump routine.
+
+1999-06-28  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (show_ip_ospf_database_network): fix bug of
+        `show ip ospf database network' command output.
+
+        * ospf_nsm.c (nsm_inactivity_timer): Clear list of Link State
+        Retransmission, Database Summary and Link State Request.
+
+        * ospf_packet.c (ospf_ls_req_timer): New function added.
+        Set Link State Request retransmission timer.
+
+1999-06-27  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_main.c (main): Change default output from ZLOG_SYSLOG to
+        ZLOG_STDOUT.
+
+        * ospfd.c (ospf_init): Register show_ip_ospf_interface_cmd and
+        show_ip_ospf_neighbor_cmd to VIEW_NODE.
+
+        * ospf_lsa.c (ospf_lsa_init): Register show_ip_ospf_database_cmd
+        and show_ip_ospf_database_type_cmd to VIEW_NODE.
+
+1999-06-25  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c: fix bug of DD making.
+        fix bug of LS-Update reading.
+        
+1999-06-23  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c: All type of packets are changed to use
+        fifo queue structure.
+        (ospf_fill_header) function added.
+
+1999-06-22  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c (ospf_packet_new): New function added to handle
+        sending ospf packet by fifo queue structure.
+        (ospf_packet_free), (ospf_fifo_new), (ospf_fifo_push),
+        (ospf_fifo_pop), (ospf_fifo_head), (ospf_fifo_flush),
+        (ospf_fifo_free): Likewise.
+
+1999-06-21  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_nsm.c (ospf_db_desc_timer): function added.
+        (nsm_timer_set) function added.
+        * ospf_dump.c (ospf_option_dump): function added.
+        * ospf_packet.c (ospf_ls_req) (ospf_make_ls_req): function added.
+
+1999-06-20  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c (ospf_lsa_more_recent): function added.
+        * ospf_neighbor.h (struct ospf_neighbor): Change member ms_flag
+        to dd_flags.
+        
+1999-06-19  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c: DEFUN (show_ip_ospf_database) Added.
+        * ospf_interface.c (if_ospf_cost), (if_ospf_dead_interval),
+        (if_ospf_hello_interval), (if_ospf_priority),
+        (if_ospf_retransmit_interval), (if_ospf_transmit_delay)
+        argument changed from NUMBER to <range>.
+        DEFUN (if_ospf_network_broadcast),
+        DEFUN (if_ospf_network_non_broadcast),
+        DEFUN (if_ospf_network_point_to_multipoint),
+        DEFUN (if_ospf_network_point_to_point) functions are combined to
+        DEFUN (if_ospf_network).
+        
+1999-06-18  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c: ospf_add_router_lsa (), ospf_add_network_lsa (),
+        ospf_lsa_lookup (), ospf_lsa_count () Added.
+
+1999-06-15  Toshiaki Takada  <takada@zebra.org>
+
+        * DEFUN (ospf_debug_ism), DEFUN (ospf_debug_nsm),
+        DEFUN (no_ospf_debug_ism), DEFUN (no_ospf_debug_nsm) Added.
+        `debug ospf ism' command shows debug message.
+        `debuf ospf nsm' command shows debug message.
+
+1999-06-14  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c: ospf_network_lsa () Added.
+        ospf_lsa_checksum () Added.
+        * DEFUN (ospf_debug_packet), DEFUN (no_ospf_debug_packet) Added.
+        `debug ospf packet' command shows debug message.
+
+1999-06-13  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.h: Remove struct ospf_ls_req {}, ospf_ls_upd {},
+        ospf_ls_ack {}.
+
+1999-06-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_dump.c: fix IP packet length treatment.
+
+1999-06-10  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.h: Add OSPF_ISM_EVENT_EXECUTE() Macro Added.
+        * ospf_nsm.h: Add OSPF_NSM_EVENT_EXECUTE() Macro Added.
+
+        * ospf_packet.c: ospf_db_desc (), ospf_db_desc_send () Added.
+        ospf_make_hello (), ospf_make_db_desc () Added.
+        ospf_db_desc_proc () Added.n
+
+        * Database Description packet can be processed.
+
+1999-06-08  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.c: New file.
+        
+1999-06-07  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_neighbor.c: ospf_fully_adjacent_count () Added.
+
+1999-06-07  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_spf.[ch]: New file.
+
+1999-05-30  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_zebra.c: Changed to use lib/zclient.c routines.
+
+        * ospf_zebra.h (zebra_start): Remove struct zebra.
+
+1999-05-29  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospfd.c (ospf_config_write): Add cast (unsigned long int) to
+        ntohl for sprintf warning.
+
+1999-05-19  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.c (ospf_dr_election): Join AllDRouters Multicast group
+        if interface state changes to DR or BDR.
+
+1999-05-14  Stephen R. van den Berg <srb@cuci.nl>
+
+        * ospf_main.c (signal_init): SIGTERM call sigint.
+        (sigint): Logging more better message.
+
+1999-05-12  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c: Fix bug of `no router ospf' statement, it will work.
+
+1999-05-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_neighbor.c: ospf_nbr_free () Added.
+
+1999-05-10  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.h: struct ospf_area { }, struct ospf_network { } Changed.
+        * Fix bug of `no network' statement, it will work.
+
+1999-05-07  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.c, ospf_zebra.c: Fix bug of last interface is not
+        updated by ospf_if_update ().
+
+1999-04-30  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * Makefile.am (noinst_HEADERS): Add ospf_lsa.h for distribution.
+
+1999-04-25  Toshiaki Takada <takada@zebra.org>
+
+        * ospf_interface.c: DEFUN (no_if_ospf_cost),
+        DEFUN (no_if_ospf_dead_interval),
+        DEFUN (no_if_ospf_hello_interval),
+        DEFUN (no_if_ospf_priority),
+        DEFUN (no_if_ospf_retransmit_interval),
+        DEFUN (no_if_ospf_transmit_delay) Added.
+
+        interface_config_write () suppress showing interface
+        default values.
+
+1999-04-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_dump.c (ospf_timer_dump): If thread is NULL return "inactive".
+
+        * ospfd.c (ospf_if_update): Fix bug of using ospf_area { } instead
+        of ospf_network { }.  So `router ospf' statement in ospfd.conf
+        works again.
+        (ospf_if_update): Call ospf_get_router_id for updating router ID.
+
+1999-04-25  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.c: DEFUN (if_ospf_network) deleted.
+        DEFUN (if_ospf_network_broadcast),
+        DEFUN (if_ospf_network_non_broadcast),
+        DEFUN (if_ospf_network_point_to_multipoint),
+        DEFUN (if_ospf_network_point_to_point),
+        DEFUN (no_if_ospf_network) Added.
+
+1999-04-23  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.h: struct area { } changed to struct ospf_network { }.
+        Add struct ospf_area { }.
+        * ospfd.c: Add ospf_area_lookup_by_area_id (), ospf_network_new (),
+        and ospf_network_free ().
+        DEFUN (area_authentication), DEFUN (no_area_authentication) Added.
+
+1999-04-22  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_lsa.h: New file.
+        * ospf_packet.h: LSA related struct definition are moved to
+        ospf_lsa.h.
+        * ospf_packet.c: ospf_verify_header () Added.
+
+1999-04-21  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.c: ospf_elect_dr () and related function is changed.
+        DR Election bug fixed.
+        * ospf_dump.c: ospf_nbr_state_message (), ospf_timer_dump () Added.
+        * ospfd.c: DEFUN (show_ip_ospf_neighbor) Added.
+
+1999-04-19  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_main.c (main): access_list_init () is added for vty
+        connection filtering.
+
+1999-04-16  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.c: DEFUN (show_ip_ospf_interface) Added.
+        * ospf_neighbor.c: ospf_nbr_count () Added.
+        
+1999-04-15  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.h: struct ospf { } Changed.
+        * ospfd.c: ospf_lookup_by_process_id () Deleted.
+        * ospf_ism.c: ospf_wait_timer () Added. WaitTimer will work.
+
+1999-04-14  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.c: ospf_elect_dr () Added.
+        * ospf_network.c: ospf_if_ipmulticast () Added.
+
+1999-04-11  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.c: interface_config_write (),
+        DEFUN (if_ip_ospf_cost),
+        DEFUN (if_ip_ospf_dead_interval),
+        DEFUN (if_ip_ospf_hello_interval),
+        DEFUN (if_ip_ospf_priority),
+        DEFUN (if_ip_ospf_retransmit_interval) and
+        DEFUN (if_ip_ospf_transmit_delay) Added.
+
+1999-04-08  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_dump.c: ospf_packet_db_desc_dump () Added.
+        * ospf_neighbor.c: ospf_nbr_bidirectional () Added.
+        * ospf_nsm.c: nsm_twoway_received () Added.
+
+1999-04-02  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_neighbor.c: New file.
+        * ospf_neighbor.h: New file.
+        * ospf_nsm.c: New file.
+        * ospf_nsm.h: New file.
+        * ospf_packet.c: Add ospf_make_header (), ospf_hello () and
+        ospf_hello_send (). Now OSPFd can receive Hello and send Hello.
+
+1999-03-27  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_packet.c: Add ospf_recv_packet ().  Now OSPF Hello can receive.
+
+1999-03-19  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_packet.c: New file.
+        * ospf_packet.h: New file.
+        * ospf_network.c: New file.
+        * ospf_network.h: New file.
+        * ospfd.h: move OSPF message structure has moved to ospf_packet.h.
+
+1999-03-17  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * ospf_zebra.c (ospf_zebra_get_interface): Fix for IPv6 interface
+        address.
+
+        * Makefile.am (install-sysconfDATA): Overwrite install-sysconfDATA
+        for install ospfd.conf.sample as owner read only file.
+
+        * ospf_main.c (usage): Change to use ZEBRA_BUG_ADDRESS.
+
+1999-03-15  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_ism.c: New file.
+        * ospf_ism.h: New file.
+        * ospf_dump.c: New file.
+        * ospf_dump.h: New file.
+
+        * ospfd.h: Add (struct ospf), (struct config_network),
+        (struct message) structure.
+
+        * ospf_interface.c: Add ospf_if_match_network ().
+        * ospf_interface.h (struct ospf_interface): Change struct members.
+
+        * ospfd.c: ospf_lookup_by_process_id (), ospf_network_new (),
+        DEFUN (network_area): Added.
+
+        * ospfd.conf.sample: Change sample configuration.
+
+1999-03-05  Toshiaki Takada  <takada@zebra.org>
+
+        * ospf_interface.c: New file.
+        * ospf_interface.h: New file.
+        * ospf_zebra.h: New file.
+        * ospf_zebra.c: Add interface function for zebra daemon.
+        * ospfd.c: New file.
+
+1999-02-23  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * Move IPv6 codes and files to ospf6d directory.
+
+1999-02-18  Peter Galbavy  <Peter.Galbavy@knowledge.com>
+
+        * syslog support added
+
+1998-12-22  Toshiaki Takada  <takada@zebra.org>
+
+        * ospfd.h: New file.
+        * ospf_lsa.h: New file.
+
+1998-12-15  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+        * Makefile.am: New file.
+        * ospf_main.c: New file.
+

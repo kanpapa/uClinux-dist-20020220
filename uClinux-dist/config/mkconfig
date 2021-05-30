@@ -1,0 +1,114 @@
+#! /bin/sh
+#############################################################################
+#
+#	Generate the vendor/product menu entries for the top level config
+#
+#############################################################################
+
+fix_name()
+{
+	echo $1 | tr '[\-\.\/\+a-z]' '[____A-Z]'
+}
+
+#############################################################################
+#
+# the header of the config
+#
+
+cat <<!EOF
+mainmenu_name 'uClinux Configuration'
+mainmenu_option next_comment
+comment 'Target Platform Selection'
+comment 'Choose a Vendor/Product combination.'
+!EOF
+
+#############################################################################
+#
+# Figure out the vendor/products dynamically, allows people to add there
+# own without messin with the config.in file
+#
+
+echo -n "choice 'Vendor/Product' \""
+
+find vendors/*/*/config.arch -print | sed -e 's?/? ?g' | \
+		sort | while read t1 v p t2
+do
+	echo "${v}/${p} CONFIG_DEFAULTS_`fix_name ${v}`_`fix_name ${p}` \\"
+done
+
+echo "\" SecureEdge/SecureEdgeVPN"
+
+#############################################################################
+#
+# Which kernel do they want,  if only one then just set it,  I don't
+# expect an explosion of kernels just yet ;-)
+#
+
+if [ `ls -d linux linux-2.2.x linux-2.4.x 2>/dev/null | wc -l` -gt 1 ]; then
+	echo -n "choice 'Kernel Version' \""
+	[ -e linux ] && DEF=uClinux-2.0.x && \
+		echo "uClinux-2.0.x CONFIG_DEFAULTS_KERNEL_2_0 \\"
+	[ -e linux-2.2.x ] && DEF=linux-2.2.x && \
+		echo "linux-2.2.x CONFIG_DEFAULTS_KERNEL_2_2 \\"
+	[ -e linux-2.4.x ] && DEF=uClinux-2.4.x && \
+		echo "uClinux-2.4.x CONFIG_DEFAULTS_KERNEL_2_4 \\"
+	echo "\" $DEF"
+elif [ -e linux ]; then
+	echo "comment 'Kernel is uClinux-2.0.x'"
+	echo "define_bool CONFIG_DEFAULTS_KERNEL_2_0 y"
+elif [ -e linux-2.2.x ]; then
+	echo "comment 'Kernel is linux-2.2.x'"
+	echo "define_bool CONFIG_DEFAULTS_KERNEL_2_2 y"
+elif [ -e linux-2.4.x ]; then
+	echo "comment 'Kernel is uClinux-2.4.x'"
+	echo "define_bool CONFIG_DEFAULTS_KERNEL_2_4 y"
+else
+	echo "ERROR: you have no kernels available in this directory." >&2
+	exit 1
+fi
+
+#############################################################################
+#
+# Which libc do they want,  if only one then just set it,  I don't
+# expect an explosion of libc's just yet ;-)
+#
+
+if [ `ls -d glibc uClibc lib/libc 2>/dev/null | wc -l` -gt 1 ]; then
+	echo -n "choice 'Libc Version' \""
+	[ -e glibc ] && echo "Glibc CONFIG_DEFAULTS_GLIBC \\" && DEF=glibc
+	[ -e uClibc ] && echo "uClibc CONFIG_DEFAULTS_UCLIBC \\" && DEF=uClibc
+	[ -e lib/libc ] && echo "uC-libc CONFIG_DEFAULTS_OLDUCLIBC \\" && \
+			DEF=uC-libc
+	echo "\" $DEF"
+elif [ -e lib/libc ]; then
+	echo "comment 'Library is uC-libc (old)'"
+	echo "define_bool CONFIG_DEFAULTS_OLDUCLIBC y"
+elif [ -e uClibc ]; then
+	echo "comment 'Library is uClibc'"
+	echo "define_bool CONFIG_DEFAULTS_UCLIBC y"
+elif [ -e glibc ]; then
+	echo "comment 'Library is glibc'"
+	echo "define_bool CONFIG_DEFAULTS_GLIBC y"
+else
+	echo "ERROR: you have no libc available in this directory." >&2
+	exit 1
+fi
+
+#############################################################################
+#
+# the rest of the config
+#
+
+cat <<!EOF
+bool 'Default all settings (lose changes)'	CONFIG_DEFAULTS_OVERRIDE
+bool 'Customize Kernel Settings'			CONFIG_DEFAULTS_KERNEL
+!EOF
+[ -d modules ] &&
+	echo "bool 'Customize Module Settings'			CONFIG_DEFAULTS_MODULES"
+cat <<!EOF
+bool 'Customize Vendor/User Settings'		CONFIG_DEFAULTS_VENDOR
+bool 'Update Default Vendor Settings'		CONFIG_DEFAULTS_VENDOR_UPDATE
+endmenu
+!EOF
+
+############################################################################

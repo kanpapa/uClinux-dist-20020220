@@ -1,0 +1,5 @@
+Author: Jozsef Kadlecsik
+Status: Submitted for kernel inclusion
+
+The LOG target has a bug when attempting to print the inner ip packet in
+icmp error messages.  This patch fixes the bug.

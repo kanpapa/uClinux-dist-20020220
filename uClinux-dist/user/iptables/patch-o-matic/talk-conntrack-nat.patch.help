@@ -1,0 +1,20 @@
+Author: Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>
+Status: Alpha
+
+This adds CONFIG_IP_NF_TALK: talk support module for netfilter
+connection tracking and NAT.  This allows both the callee client -
+caller server and callee client - caller client connections to work
+through connection tracking and NAT.
+
+Default both otalk (UDP port 517) and talk (UDP port 518) are
+supported. otalk/talk supports can selectively be enabled/disabled 
+by the module parameters of the ip_conntrack_talk and ip_nat_talk
+modules:
+
+	otalk=0|1
+	talk=0|1
+
+where '0' means 'don't support' while '1' means 'do support'
+the given protocol flavour.
+
+THIS PATCH IS INCOMPATIBLE WITH dropped-table.patch

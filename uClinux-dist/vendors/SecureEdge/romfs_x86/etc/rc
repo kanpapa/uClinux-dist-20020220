@@ -1,0 +1,17 @@
+hostname SecureEdge 
+date `cat /etc/build-date`
+/bin/expand /etc/ramfs.img /dev/ram0
+/bin/expand /etc/ramfs.img /dev/ram1
+mount -t proc proc /proc
+mount -t ext2 /dev/ram0 /var
+mount -t ext2 /dev/ram1 /etc/config
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+/bin/flatfsd -r
+cp /etc/1 /proc/sys/net/ipv4/ip_forward
+insmod ipsec
+insmod hifn7951
+/bin/sh /etc/config/start
+/bin/firewall &

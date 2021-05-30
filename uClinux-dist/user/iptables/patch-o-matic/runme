@@ -1,0 +1,322 @@
+#! /bin/sh
+# Script to ask user if they want patches applied.
+# Sun 12 Nov 2000 Harald Welte <laforge@gnumonks.org>
+#		- added support for other protocols than ipv4
+
+printheader()
+{
+    clear 2> /dev/null
+    echo "Welcome to Rusty's Patch-o-matic!"
+    echo
+    echo "Each patch is a new feature: many have minimal impact, some do not."
+    echo "Almost every one has bugs, so I don't recommend applying them all!"
+    echo "-------------------------------------------------------"
+    if [ -n "$1" ]; then
+	echo $1 | fold -s -w 60 | while read LINE
+	do
+	    echo Already applied: $LINE
+	done
+	echo
+    fi 
+}
+
+if [ -z "$KERNEL_DIR" ]
+then
+    echo Hey\! KERNEL_DIR is not set.
+    echo -n "Where is your kernel? [/usr/src/linux] "
+    read KERNEL_DIR
+fi
+
+if [ ! -f ${KERNEL_DIR:=/usr/src/linux}/Makefile ]
+then
+    echo $KERNEL_DIR doesn\'t look like a kernel tree to me. >&2
+    exit 1
+fi
+VERSION=`grep '^VERSION' $KERNEL_DIR/Makefile | cut -d= -f2`
+PATCHLEVEL=`grep '^PATCHLEVEL' $KERNEL_DIR/Makefile | cut -d= -f2`
+if [ "$VERSION" -lt 2 -o "$PATCHLEVEL" -lt 4 ]
+then
+    echo $KERNEL_DIR looks like a $VERSION.$PATCHLEVEL kernel tree to me. >&2
+    echo I expect a 2.4 kernel or above. >&2
+    exit 1
+fi
+
+echo "Examining kernel in $KERNEL_DIR"
+echo "-----------------------------------------------------------------"
+
+tmpdirname()
+{
+	dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -x -w32 -A n | tr -d ' '
+}
+
+# Too many rejects from trying to patch Configure.help and Config.in.
+# So we use special format: First line specifies entry we want to
+# follow, and rest of file is pasted in under that.
+
+# Args: config.in file, netfilter dir.
+apply_config_in_change()
+{
+    PRIOR="`head -1 $1`"
+    LINE=`fgrep -x -n "$PRIOR" $2/Config.in | cut -d: -f1`
+    if [ -z "$LINE" ]
+    then
+	echo Could not find place to slot in Config.in line >&2
+	return 1
+    fi
+    rm -f $2/Config.in.tmp
+    if (head -$LINE $2/Config.in && tail +2 $1 && tail +`expr $LINE + 1` $2/Config.in) > $2/Config.in.tmp
+    then
+	mv $2/Config.in.tmp $2/Config.in
+    else
+	echo Could not slot in Config.in line >&2
+	rm -f $2/Config.in.tmp
+	return 1
+    fi
+    echo "   Placed new Config.in line"
+    return 0
+}
+
+# Args: configure.help file, Documentation dir.
+apply_config_help_change()
+{
+    PRIOR="`head -1 $1`"
+    LINE=`fgrep -x -n "$PRIOR" $2/Configure.help | cut -d: -f1 | head -1`
+    if [ -z "$LINE" ] || [ "$LINE" -eq 0 ]
+    then
+	echo Could not find place to slot in Configure.help entry >&2
+	return 1
+    fi
+    # Find *next* entry by char at beginning of line.
+    NEXTOFFSET=`tail +$LINE $2/Configure.help | grep -n '^[A-Za-z0-9]' | head -1 | cut -d: -f1`
+    if [ -z "$NEXTOFFSET" ] || [ "$NEXTOFFSET" -eq 0 ]
+    then
+	echo Could not find next place to slot in Configure.help entry >&2
+	return 1
+    fi
+    LINE=`expr $LINE + $NEXTOFFSET - 3`
+
+    rm -f $2/Configure.help.tmp
+    if (head -$LINE $2/Configure.help && tail +2 $1 && echo && tail +`expr $LINE + 1` $2/Configure.help) > $2/Configure.help.tmp
+    then
+	mv $2/Configure.help.tmp $2/Configure.help
+    else
+	echo Could not slot in Configure.help entry >&2
+	rm -f $2/Configure.help.tmp
+	return 1
+    fi
+    echo "   Placed new Configure.help entry"
+    return 0
+}
+
+# Args: makefile file, netfilter dir.
+apply_makefile_change()
+{
+    PRIOR="`head -1 $1`"
+    END="`tail +2 $1 | head -1`"
+    LINE=`fgrep -x -n "$PRIOR" $2/Makefile | cut -d: -f1`
+    if [ -z "$LINE" ] || [ "$LINE" -eq 0 ]
+    then
+	echo Could not find place to slot in Makefile entry >&2
+	return 1
+    fi
+    
+    rm -f $2/Makefile.tmp
+    if (head -$LINE $2/Makefile && tail +2 $1 && tail +`expr $LINE + 1` $2/Makefile) > $2/Makefile.tmp
+    then
+	mv $2/Makefile.tmp $2/Makefile
+    else
+	echo Could not slot in Makefile entry >&2
+	rm -f $2/Makefile.tmp
+	return 1
+    fi
+    echo "   Placed new Makefile entry $1"
+    return 0
+}
+
+# Don't like to use GLOBIGNORE stuff; can't use shopt (bash v1).
+expand_no_backups()
+{
+    for expansion in $1
+    do
+	case "$expansion"
+	in
+	    "$1") ;;
+	    *~) ;;
+	    *) echo "$expansion";;
+	esac
+    done
+}
+
+apply_config_in_changes()
+{
+	ret=0
+
+	for x in `expand_no_backups "$1.config.in*"`
+	do
+	    apply_config_in_change $x $2 || ret=1
+	done
+
+	return $ret
+}
+
+apply_config_help_changes()
+{
+	ret=0
+
+	for x in `expand_no_backups "$1.configure.help*"`
+	do
+	    apply_config_help_change $x $2 || ret=1
+	done
+
+	return $ret
+}
+
+apply_makefile_changes()
+{
+	ret=0
+
+	for x in `expand_no_backups "$1.makefile*"`
+	do
+	    apply_makefile_change $x $2 || ret=1
+	done
+
+	return $ret
+}
+
+# I'm paranoid.  Test patch first.
+# Args: patch filename, protocol.
+test_patch()
+{
+    KTMPDIR=$KERNEL_DIR/../`tmpdirname`
+    # On exit, clean up
+    trap "rm -rf $KTMPDIR" 0
+    if cp -al $KERNEL_DIR/. $KTMPDIR
+    then :
+    else
+	echo Failed to make copy of $KERNEL_DIR >&2
+	rm -rf $KTMPDIR
+	exit 1
+    fi
+
+    echo Testing patch $1...
+
+    if apply_config_in_changes $1 $KTMPDIR/net/$2/netfilter &&
+	apply_config_help_changes $1 $KTMPDIR/Documentation &&
+	apply_makefile_changes $1 $KTMPDIR/net/$2/netfilter
+    then :
+    else
+	rm -rf $KTMPDIR
+	return 1
+    fi
+
+    REJECTSBEFORE="`find $KTMPDIR/. -name '*.rej' -exec cat {} \; | grep -c '^\*\*\* '`"
+    if (cd $KTMPDIR && patch -p1 >/dev/null) < $1
+    then :
+    else
+	echo Failed to patch copy of $KERNEL_DIR >&2
+	rm -rf $KTMPDIR
+	return 1
+    fi
+    REJECTSAFTER="`find $KTMPDIR/. -name '*.rej' -exec cat {} \; | grep -c '^\*\*\* '`"
+	
+    if [ "$REJECTSBEFORE" -ne "$REJECTSAFTER" ]
+    then
+	echo Patch $1 seems to have had rejects \(`expr $REJECTSAFTER - $REJECTSBEFORE` new rejections\) >&2
+	rm -rf $KTMPDIR
+	return 1
+    fi
+    rm -rf $KTMPDIR
+
+    echo "   Patch $1 applied cleanly."
+    return 0
+}
+
+# Args: patch filename, protocol.
+apply_patch()
+{
+    echo Applying patch $1...
+    REJECTSBEFORE="`find $KERNEL_DIR/. -name '*.rej' -exec cat {} \; | grep -c '^\*\*\* '`"
+    if (cd $KERNEL_DIR && patch -p1 > /dev/null) < $1
+    then :
+    else
+	echo Failed to patch $KERNEL_DIR >&2
+	exit 1
+    fi
+    REJECTSAFTER="`find $KERNEL_DIR/. -name '*.rej' -exec cat {} \; | grep -c '^\*\*\* '`"
+
+    if [ $REJECTSBEFORE -ne $REJECTSAFTER ]
+    then
+	echo WARNING: patch $1 seems to have had rejects \(`expr $REJECTSAFTER - $REJECTSBEFORE` new rejections\):
+	find $KERNEL_DIR/. -name '*rej'
+    else
+	echo "   Patch $1 applied cleanly."
+    fi
+    apply_config_in_changes $1 $KERNEL_DIR/net/$2/netfilter/
+    apply_config_help_changes $1 $KERNEL_DIR/Documentation/
+    apply_makefile_changes $1 $KERNEL_DIR/net/$2/netfilter/
+}
+
+APPLIED=""
+for f in ${@:-`echo *.patch *.patch.ipv6`}
+do
+    BASE=${f%%.patch*}	# filename without .patch*
+    PROTO=${f##$BASE.patch}
+    PROTO=${PROTO##.}
+    printheader "$APPLIED"
+    echo -n "Testing... "
+    if ../isapplied $KERNEL_DIR $f
+    then
+	APPLIED="$APPLIED $BASE${PROTO:+-$PROTO}"
+    else
+	echo The $BASE ${PROTO:+$PROTO } patch:
+	while read LINE; do echo "   $LINE"; done < $f.help
+	echo
+	ANSWER=""
+	while [ "$ANSWER" = "" ]
+	do
+	    echo -n 'Do you want to apply this patch [N/y/t/f/q/?] '
+	    read ANSWER
+	    case "$ANSWER" in 
+	    y*|Y*)
+		if test_patch $f ${PROTO:-"ipv4"}
+		then
+		    apply_patch $f ${PROTO:-"ipv4"}
+		    APPLIED="$APPLIED $BASE${PROTO:+-$PROTO}"
+		else
+		    echo TEST FAILED: patch NOT applied.
+		    ANSWER=""
+		fi
+		;;
+	    t*|T*)
+		ANSWER=""
+		test_patch $f ${PROTO:-"ipv4"}
+		;;
+	    f*|F*)
+		apply_patch $f ${PROTO:-"ipv4"}
+		APPLIED="$APPLIED $BASE${PROTO:+-$PROTO}"
+		;;
+	    N*|n*|'')
+		ANSWER=N ;;
+	    q*|Q*)
+		echo Bye!
+		exit 0 ;;
+	    *)
+		ANSWER=""
+		echo "Answer one of the following: "
+		echo "  T to test that patch will apply cleanly"
+		echo "  Y to apply patch"
+		echo "  N to skip this patch"
+		echo "  F to apply patch even if test fails"
+		echo "  Q to quit immediately"
+		echo "  ? for help"
+		echo
+		;;
+	    esac
+	echo "-----------------------------------------------------------------"
+	done
+    fi
+done
+
+echo
+echo Excellent\!  Kernel is now ready for compilation.
+exit 0

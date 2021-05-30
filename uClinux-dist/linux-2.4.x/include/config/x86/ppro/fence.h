@@ -1,0 +1,1 @@
+#define CONFIG_X86_PPRO_FENCE 1

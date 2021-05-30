@@ -1,0 +1,14 @@
+Author: Andras Kis-Szabo <kisza@sch.bme.hu>
+Status: In Development (testing)
+
+  This module is perform checking on the IPv6 IP address
+  Compares the last 64 bits with the aggregated (delivered
+  from the MAC address)
+
+ Example:
+  ip6tables -N ipv6ok
+  ip6tables -A INPUT -m agr -j ipv6ok
+  ip6tables -A INPUT -s ! 3FFE:2F00:A0::/64 -j ipv6ok
+  ip6tables -A INPUT -j LOG
+  ip6tables -A ipv6ok -j ACCEPT
+

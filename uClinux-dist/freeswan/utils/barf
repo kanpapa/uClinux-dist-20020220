@@ -1,0 +1,184 @@
+#! /bin/sh
+# dump assorted information of use in debugging
+# Copyright (C) 1998, 1999  Henry Spencer.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: barf,v 1.50 2001/06/15 16:18:22 henry Exp $
+
+KERNSRC=${KERNSRC-/usr/src/linux}
+LOGS=${LOGS-/var/log}
+me="ipsec barf"
+
+# message patterns that start relevant parts of logs
+fstart='Starting FreeS.WAN'
+pstart='Starting Pluto'
+
+case "$1" in
+--help)		echo "Usage: ipsec barf" ; exit 0	;;
+--version)	echo "$me $IPSEC_VERSION" ; exit 0	;;
+esac
+
+# make sure output is in English
+unset LANG LANGUAGE LC_ALL LC_MESSAGES
+
+# log-location guesser, result in $findlog_result
+findlog() {		# findlog string possiblefile ...
+	s="$1"
+	shift
+	t=
+	# try the suggested files first
+	for f in $*
+	do
+		if test -r $LOGS/$f -a ! -d $LOGS/$f && egrep -q "$s" $LOGS/$f
+		then
+			# aha, this one has it
+			findlog_result=$LOGS/$f
+			return 0
+		fi
+	done
+	# nope, resort to a search, newest first, of uncompressed logs
+	for f in `ls -t $LOGS | egrep -v '\.(gz|Z)$'`
+	do
+		if test -r $LOGS/$f -a ! -d $LOGS/$f && egrep -q "$s" $LOGS/$f
+		then
+			# found it
+			findlog_result=$LOGS/$f
+			return 0
+		fi
+	done
+	echo "$0: unable to find $LOGS/$1 or local equivalent" >&2
+	findlog_result=/dev/null
+}
+
+# try to guess where logs are
+findlog "$fstart" messages syslog
+klog=$findlog_result
+findlog "$pstart" secure auth.log debug
+plog=$findlog_result
+
+# advanced shell deviousness to get dividers into output
+_________________________() {
+	$1	# something to do nothing and not echo anything
+}
+
+exec 2>&1		# stderr on stdout, so errors go into main output
+
+hostname ; date
+set -x
+_________________________
+ipsec --version
+_________________________
+cat /proc/version
+_________________________
+cat /proc/net/ipsec_eroute
+_________________________
+cat /proc/net/ipsec_spi
+_________________________
+cat /proc/net/ipsec_spigrp
+_________________________
+netstat -nr
+_________________________
+cat /proc/net/ipsec_tncfg
+_________________________
+cat /proc/net/pf_key
+_________________________
+( cd /proc/net ; egrep '^' pf_key_* )
+_________________________
+( cd /proc/sys/net/ipsec ; egrep '^' * )
+_________________________
+ipsec auto --status
+_________________________
+ifconfig -a
+_________________________
+ipsec --directory
+_________________________
+hostname --fqdn
+_________________________
+hostname --ip-address
+_________________________
+uptime
+_________________________
+ipsec showdefaults
+_________________________
+ipsec _include /etc/ipsec.conf | ipsec _keycensor
+_________________________
+ipsec _include /etc/ipsec.secrets | ipsec _secretcensor
+_________________________
+ls -l ${IPSEC_DIR-/usr/local/lib/ipsec}
+_________________________
+for f in `ls ${IPSEC_DIR-/usr/local/lib/ipsec} | egrep updown`
+do
+	cat ${IPSEC_DIR-/usr/local/lib/ipsec}/$f
+done
+_________________________
+cat /proc/net/dev
+_________________________
+cat /proc/net/route
+_________________________
+cat /proc/sys/net/ipv4/ip_forward
+_________________________
+uname -a
+_________________________
+if test -r /etc/redhat-release
+then
+	cat /etc/redhat-release
+fi
+_________________________
+cat /proc/net/ipsec_version
+_________________________
+ipchains -L -v -n
+_________________________
+ipfwadm -F -l -n -e
+_________________________
+ipfwadm -I -l -n -e
+_________________________
+ipfwadm -O -l -n -e
+_________________________
+ipchains -M -L -v -n
+_________________________
+ipfwadm -M -l -n -e
+_________________________
+cat /proc/modules
+_________________________
+cat /proc/meminfo
+_________________________
+ls -l /dev/ipsec*
+_________________________
+ls -l /proc/net/ipsec_*
+_________________________
+if test -f $KERNSRC/.config
+then
+	egrep 'IP|NETLINK' $KERNSRC/.config
+fi
+_________________________
+cat /etc/syslog.conf
+_________________________
+if test -f $LOGS/kern.debug
+then
+	tail -100 $LOGS/kern.debug
+fi
+_________________________
+sed -n `egrep -n "$fstart" $klog | sed -n '$s/:.*//p'`,'$'p $klog |
+	egrep -i 'ipsec|klips|pluto' |
+	case "$1" in
+	--short)	tail -500	;;
+	*)		cat		;;
+	esac
+_________________________
+sed -n `egrep -n "$pstart" $plog | sed -n '$s/:.*//p'`,'$'p $plog |
+	egrep -i 'pluto' |
+	case "$1" in
+	--short)	tail -500	;;
+	*)		cat		;;
+	esac
+_________________________
+date

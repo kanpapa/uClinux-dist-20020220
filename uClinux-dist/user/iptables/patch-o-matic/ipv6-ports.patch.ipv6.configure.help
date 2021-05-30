@@ -1,0 +1,34 @@
+limit match support
+CONFIG_IP6_NF_MATCH_LIMIT
+  limit matching allows you to control the rate at which a rule can be
+  matched: mainly useful in combination with the LOG target ("LOG
+  target support", below) and to avoid some Denial of Service attacks.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+MAC address match support
+CONFIG_IP6_NF_MATCH_MAC
+  mac matching allows you to match packets based on the source
+  ethernet address of the packet.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Multiple port match support
+CONFIG_IP6_NF_MATCH_MULTIPORT
+  Multiport matching allows you to match TCP or UDP packets based on
+  a series of source or destination ports: normally a rule can only
+  match a single range of ports.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+Owner match support (EXPERIMENTAL)
+CONFIG_IP6_NF_MATCH_OWNER
+  Packet owner matching allows you to match locally-generated packets
+  based on who created them: the user, group, process or session.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+

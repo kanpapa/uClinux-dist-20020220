@@ -1,0 +1,8 @@
+Author: Brad Chapman <kakadu@earthlink.net>
+Status: Submitted for kernel inclusion
+
+This is a bugfix for the ip6_tables code in the current ( <= 2.4.8-pre3 )
+kernel source.  It fixes the situation, where ip6_tables.o is statically
+linked into the kernel, but some modules (matches/targets/...) want to 
+register with ip6_tables.
+

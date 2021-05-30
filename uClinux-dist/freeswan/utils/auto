@@ -1,0 +1,389 @@
+#! /bin/sh
+# user interface to automatic keying and Pluto in general
+# Copyright (C) 1998, 1999, 2000  Henry Spencer.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: auto,v 1.61 2001/06/01 15:49:13 henry Exp $
+
+me='ipsec auto'
+usage="Usage:
+	$me [--showonly] [--asynchronous] --up connectionname
+	$me [--showonly] --{add|delete|replace|down} connectionname
+	$me [--showonly] --{route|unroute} connectionname
+	$me [--showonly] --{ready|status|rereadsecrets}
+
+	other options: [--config ipsecconfigfile] [--verbose] [--show]"
+
+showonly=
+config=/etc/ipsec.conf
+info=/var/run/ipsec.info
+shopts=
+noinclude=
+async=
+logfilter='$1 != "002"'
+op=
+argc=
+
+for dummy
+do
+	case "$1" in
+	--help)		echo "$usage" ; exit 0	;;
+	--version)	echo "$me $IPSEC_VERSION" ; exit 0	;;
+	--show)		shopts=-x		;;
+	--showonly)	showonly=yes		;;
+	--config)	config="$2" ; shift	;;
+	--noinclude)	noinclude=--noinclude	;;
+	--asynchronous)	async="--asynchronous"	;;
+	--verbose)	logfilter='1'		;;
+	--up|--down|--add|--delete|--replace|--route|--unroute)
+			if test " $op" != " "
+			then
+				echo "$usage" >&2
+				exit 2
+			fi
+			op="$1"
+			argc=1
+			;;
+	--ready|--status|--rereadsecrets)
+			if test " $op" != " "
+			then
+				echo "$usage" >&2
+				exit 2
+			fi
+			op="$1"
+			argc=0
+			;;
+	--)		shift ; break		;;
+	-*)		echo "$me: unknown option \`$1'" >&2 ; exit 2 ;;
+	*)		break			;;
+	esac
+	shift
+done
+
+names=
+case "$op$#:$1:$2" in
+2:*:up|2:*:down|2:*:add|2:*:delete|2:*:replace|2:*:route|2:*:unroute)
+		echo "$me: warning: obsolete command syntax used" >&2
+		names="$1"
+		op="--$2"
+		;;
+1:ready:|1:status:|1:rereadsecrets:)
+		echo "$me: warning: obsolete command syntax used" >&2
+		op="--$1"
+		;;
+--*)		if test " $argc" -ne $#
+		then
+			echo "$usage" >&2
+			exit 2
+		fi
+		names="$*"
+		;;
+*)		echo "$usage" >&2 ; exit 2	;;
+esac
+
+
+
+runit() {
+	if test "$showonly"
+	then
+		cat
+	else
+		sh $shopts | awk "$logfilter"
+	fi
+}
+
+case "$op" in
+--ready)	echo "ipsec whack --listen"		| runit ; exit ;;
+--rereadsecrets)	echo "ipsec whack --listen"	| runit ; exit ;;
+--up)	echo "ipsec whack $async --name $names --initiate" | runit ; exit ;;
+--down)	echo "ipsec whack --name $names --terminate"	| runit ; exit ;;
+--delete)	echo "ipsec whack --name $names --delete"  | runit ; exit ;;
+--route)	echo "ipsec whack --name $names --route"   | runit ; exit ;;
+--unroute)	echo "ipsec whack --name $names --unroute" | runit ; exit ;;
+--status)	echo "ipsec whack --status"		| runit ; exit ;;
+esac
+
+if test -s $info
+then
+	. $info
+fi
+
+ipsec _confread --config $config $noinclude $names |
+awk '	BEGIN {
+		FS = "\t"
+		op = "'"$op"'"
+		err = "cat >&2"
+		draddr = "'"$defaultrouteaddr"'"
+		drnexthop = "'"$defaultroutenexthop"'"
+		failed = 0
+		s[""] = ""
+		init()
+		print "PATH=\"'"$PATH"'\""
+		print "export PATH"
+	}
+	function init(   n) {
+		for (n in s)
+			delete s[n]
+		name = ""
+		seensome = 0
+	}
+	$1 == ":" {
+		s[$2] = $3
+		seensome = 1
+		next
+	}
+	$1 == "!" {
+		if ($2 != "")
+			fail($2)
+		next
+	}
+	$1 == "=" {
+		if (name == "")
+			name = $2
+		next
+	}
+	$1 == "." {
+		output()
+		init()
+		next
+	}
+	{
+		fail("internal error, unknown type code \"" $1 "\"")
+	}
+	function fail(m) {
+		print "ipsec_auto: fatal error in \"" name "\": " m |err
+		failed = 1
+		exit
+	}
+	function yesno(k) {
+		if ((k in s) && s[k] != "yes" && s[k] != "no")
+			fail("parameter \"" k "\" must be \"yes\" or \"no\"")
+	}
+	function default(k, v) {
+		if (!(k in s))
+			s[k] = v
+	}
+	function was(new, old) {
+		if (!(new in s) && (old in s))
+			s[new] = s[old]
+	}
+	function need(k) {
+		if (!(k in s))
+			fail("connection has no \"" k "\" parameter specified")
+		if (s[k] == "")
+			fail("parameter \"" k "\" value must be non-empty")
+	}
+	function integer(k) {
+		if (!(k in s))
+			return
+		if (s[k] !~ /^[0-9]+$/)
+			fail("parameter \"" k "\" value must be integer")
+	}
+	function duration(k,   n, t) {
+		if (!(k in s))
+			return
+		t = s[k]
+		n = substr(t, 1, length(t)-1)
+		if (t ~ /^[0-9]+$/)
+			s[k] = t
+		else if (t ~ /^[0-9]+s$/)
+			s[k] = n
+		else if (t ~ /^[0-9]+(\.[0-9]+)?m$/)
+			s[k] = int(n*60)
+		else if (t ~ /^[0-9]+(\.[0-9]+)?h$/)
+			s[k] = int(n*3600)
+		else if (t ~ /^[0-9]+(\.[0-9]+)?d$/)
+			s[k] = int(n*3600*24)
+		else
+			fail("parameter \"" k "\" not valid time, must be nnn[smhd]")
+	}
+	function nexthopset(dir, val,   k) {
+		k = dir "nexthop"
+		if (k in s)
+			fail("non-default value of " k " is being overridden")
+		if (val != "")
+			s[k] = val
+		else if (k in s)
+			delete s[k]
+	}
+	function id(dir,   k) {
+		k = dir "id"
+		if (!(k in s))
+			k = dir
+		return s[k]
+	}
+	function whackkey(dir,   rk) {
+		if (id(dir) == "%opportunistic")
+			return
+		rk = s[dir "rsasigkey"]
+		if (rk == "%dns")
+			print "ipsec whack --keyid", id(dir)
+		else if (rk != "")
+			print "ipsec whack --keyid", id(dir), "--pubkeyrsa", rk
+	}
+	function output() {
+		if (!seensome)
+			fail("internal error, output called inappropriately")
+
+		default("type", "tunnel")
+		if (s["type"] == "tunnel") {
+			# do NOT default subnets to side/32, despite what
+			# the docs say...
+		} else if (s["type"] == "transport") {
+			if ("leftsubnet" in s)
+				fail("type=transport incompatible with leftsubnet")
+			if ("rightsubnet" in s)
+				fail("type=transport incompatible with rightsubnet")
+		} else
+			fail("only know how to do type tunnel or transport")
+
+		need("left")
+		need("right")
+		if (s["left"] == "%defaultroute") {
+			if (s["right"] == "%defaultroute")
+				fail("left and right cannot both be %defaultroute")
+			if (draddr == "")
+				fail("%defaultroute requested but not known")
+			s["left"] = draddr
+			nexthopset("left", drnexthop)
+		} else if (s["right"] == "%defaultroute") {
+			if (draddr == "")
+				fail("%defaultroute requested but not known")
+			s["right"] = draddr
+			nexthopset("right", drnexthop)
+		}
+
+		default("keyexchange", "ike")
+		if (s["keyexchange"] != "ike")
+			fail("only know how to do keyexchange=ike")
+		default("auth", "esp")
+		if (("auth" in s) && s["auth"] != "esp" && s["auth"] != "ah")
+			fail("only know how to do auth=esp or auth=ah")
+		yesno("pfs")
+		default("pfs", "yes")
+		yesno("compress")
+		default("compress", "no")
+		was("keylife", "lifetime")
+		default("keylife", "8h")
+		duration("keylife")
+		was("rekeymargin", "rekeystart")
+		default("rekeymargin", "9m")
+		duration("rekeymargin")
+		was("keyingtries", "rekeytries")
+		default("keyingtries", 3)
+		integer("keyingtries")
+		if ("rekeyfuzz" in s) {
+			if (s["rekeyfuzz"] !~ /%$/)
+				fail("rekeyfuzz must be nnn%")
+			r = s["rekeyfuzz"]
+			s["rekeyfuzz"] = substr(r, 1, length(r)-1)
+			integer("rekeyfuzz")
+		}
+		duration("ikelifetime")
+
+		default("leftnexthop", "%direct")
+		default("rightnexthop", "%direct")
+		if (s["leftnexthop"] == s["left"])
+			fail("left and leftnexthop must not be the same")
+		if (s["rightnexthop"] == s["right"])
+			fail("right and rightnexthop must not be the same")
+		if (s["leftnexthop"] == "%defaultroute") {
+			if (drnexthop == "")
+				fail("%defaultroute requested but not known")
+			s["leftnexthop"] = drnexthop
+		}
+		if (s["rightnexthop"] == "%defaultroute") {
+			if (drnexthop == "")
+				fail("%defaultroute requested but not known")
+			s["rightnexthop"] = drnexthop
+		}
+
+		if ("leftfirewall" in s && "leftupdown" in s)
+			fail("cannot have both leftfirewall and leftupdown")
+		if ("rightfirewall" in s && "rightupdown" in s)
+			fail("cannot have both rightfirewall and rightupdown")
+		default("leftupdown", "ipsec _updown")
+		default("rightupdown", "ipsec _updown")
+		default("leftfirewall", "no")
+		default("rightfirewall", "no")
+		yesno("leftfirewall")
+		yesno("rightfirewall")
+		if (s["leftfirewall"] == "yes")
+			s["leftupdown"] = s["leftupdown"] " ipfwadm"
+		if (s["rightfirewall"] == "yes")
+			s["rightupdown"] = s["rightupdown"] " ipfwadm"
+
+		default("authby", "secret")
+		authtype = "--psk"
+		if (s["authby"] == "rsasig") {
+			authtype = "--rsasig"
+			need("leftrsasigkey")
+			need("rightrsasigkey")
+			if (id("left") == "%any")
+				fail("ID \"" id("left") "\" cannot have RSA key")
+			if (id("right") == "%any")
+				fail("ID \"" id("right") "\" cannot have RSA key")
+		} else if (s["authby"] != "secret")
+			fail("unknown authby value \"" s["authby"] "\"")
+
+		settings = "--encrypt"
+		if (s["type"] != "transport")
+			settings = settings " --tunnel"
+		if (s["auth"] == "ah")
+			settings = settings " --authenticate"
+		if (s["pfs"] == "yes")
+			settings = settings " --pfs"
+		if (s["compress"] == "yes")
+			settings = settings " --compress"
+		if (op == "--replace")
+			settings = settings " --delete"
+		if ("ikelifetime" in s)
+			settings = settings " --ikelifetime " s["ikelifetime"]
+		settings = settings " " authtype
+			
+		lc = ""
+		rc = ""
+		if ("leftsubnet" in s)
+			lc = "--client " s["leftsubnet"]
+		if ("rightsubnet" in s)
+			rc = "--client " s["rightsubnet"]
+		lud = "--updown \"" s["leftupdown"] "\""
+		rud = "--updown \"" s["rightupdown"] "\""
+		lid = ""
+		if ("leftid" in s)
+			lid = "--id " s["leftid"]
+		rid = ""
+		if ("rightid" in s)
+			rid = "--id " s["rightid"]
+		fuzz = ""
+		if ("rekeyfuzz" in s)
+			fuzz = "--rekeyfuzz " s["rekeyfuzz"]
+
+		print "ipsec whack --name", name, settings, "\\"
+		print "\t--host", s["left"], lc,
+				"--nexthop", s["leftnexthop"], lud, lid, "\\"
+		print "\t--to", "--host", s["right"], rc,
+				"--nexthop", s["rightnexthop"], rud, rid, "\\"
+		print "\t--ipseclifetime", s["keylife"],
+			"--rekeywindow", s["rekeymargin"], "\\"
+		print "\t--keyingtries", s["keyingtries"], fuzz
+		if (authtype != "--psk") {
+			whackkey("left")
+			whackkey("right")
+		}
+	}
+	END {
+		if (failed)
+			exit 1
+		if (seensome)
+			output()
+	}' | runit

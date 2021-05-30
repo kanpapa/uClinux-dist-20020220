@@ -1,0 +1,12 @@
+diff -Nru linux-2.4.9-plain/net/ipv4/netfilter/ipt_REJECT.c linux-2.4.9-REJECT-checkentry/net/ipv4/netfilter/ipt_REJECT.c
+--- linux-2.4.9-plain/net/ipv4/netfilter/ipt_REJECT.c	Mon Jun 11 23:15:27 2001
++++ linux-2.4.9-REJECT-checkentry/net/ipv4/netfilter/ipt_REJECT.c	Sun Sep  2 01:52:21 2001
+@@ -325,7 +325,7 @@
+ {
+  	const struct ipt_reject_info *rejinfo = targinfo;
+ 
+- 	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_icmp))) {
++ 	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_reject_info))) {
+   		DEBUGP("REJECT: targinfosize %u != 0\n", targinfosize);
+   		return 0;
+   	}

@@ -1,0 +1,828 @@
+diff -urN linux-2.4.4/include/linux/netfilter_ipv4.orig/ip_conntrack.h linux-2.4.4/include/linux/netfilter_ipv4/ip_conntrack.h
+--- linux-2.4.4/include/linux/netfilter_ipv4.orig/ip_conntrack.h	Tue May  8 17:09:22 2001
++++ linux-2.4.4/include/linux/netfilter_ipv4/ip_conntrack.h	Tue May  8 22:30:13 2001
+@@ -83,6 +83,10 @@
+ 
+ #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
+ 
++#if defined(CONFIG_IP_NF_TALK) || defined(CONFIG_IP_NF_TALK_MODULE)
++#include <linux/netfilter_ipv4/ip_conntrack_talk.h>
++#endif
++
+ struct ip_conntrack
+ {
+ 	/* Usage count in here is 1 for hash table/destruct timer, 1 per skb,
+@@ -121,6 +125,9 @@
+ 
+ 	union {
+ 		struct ip_ct_ftp ct_ftp_info;
++#if defined(CONFIG_IP_NF_TALK) || defined(CONFIG_IP_NF_TALK_MODULE)
++		struct ip_ct_talk ct_talk_info;
++#endif
+ 	} help;
+ 
+ #ifdef CONFIG_IP_NF_NAT_NEEDED
+diff -urN linux-2.4.4/include/linux/netfilter_ipv4.orig/ip_conntrack_talk.h linux-2.4.4/include/linux/netfilter_ipv4/ip_conntrack_talk.h
+--- linux-2.4.4/include/linux/netfilter_ipv4.orig/ip_conntrack_talk.h	Thu Jan  1 01:00:00 1970
++++ linux-2.4.4/include/linux/netfilter_ipv4/ip_conntrack_talk.h	Tue May  8 22:14:12 2001
+@@ -0,0 +1,115 @@
++#ifndef _IP_CONNTRACK_TALK_H
++#define _IP_CONNTRACK_TALK_H
++/* TALK tracking. */
++
++#ifndef __KERNEL__
++#error Only in kernel.
++#endif
++
++#include <linux/in.h>
++#include <linux/netfilter_ipv4/lockhelp.h>
++
++/* Protects talk part of conntracks */
++DECLARE_LOCK_EXTERN(ip_talk_lock);
++
++#define OTALK_PORT	517
++#define TALK_PORT	518
++
++/* talk structures and constants from <protocols/talkd.h> */
++
++/*
++ * 4.3BSD struct sockaddr
++ */
++struct talk_addr {
++	u_int16_t ta_family;
++	u_int16_t ta_port;
++	u_int32_t ta_addr;
++	u_int32_t ta_junk1;
++	u_int32_t ta_junk2;
++};
++
++/*
++ * Client->server request message formats.
++ */
++struct otalk_msg {
++	u_char	type;		/* request type, see below */
++#define	OLD_NAME_SIZE	9
++	char	l_name[OLD_NAME_SIZE];/* caller's name */
++	char	r_name[OLD_NAME_SIZE];/* callee's name */
++	u_char	pad;
++	u_int32_t id_num;	/* message id */
++	int32_t	pid;		/* caller's process id */
++#define	TTY_SIZE	16
++	char	r_tty[TTY_SIZE];/* callee's tty name */
++	struct	talk_addr addr;		/* old (4.3) style */
++	struct	talk_addr ctl_addr;	/* old (4.3) style */
++};
++
++struct talk_msg {
++	u_char	vers;		/* protocol version */
++	u_char	type;		/* request type, see below */
++	u_char	answer;		/* not used */
++	u_char	pad;
++	u_int32_t id_num;	/* message id */
++	struct	talk_addr addr;		/* old (4.3) style */
++	struct	talk_addr ctl_addr;	/* old (4.3) style */
++	int32_t	pid;		/* caller's process id */
++#define	NAME_SIZE	12
++	char	l_name[NAME_SIZE];/* caller's name */
++	char	r_name[NAME_SIZE];/* callee's name */
++	char	r_tty[TTY_SIZE];/* callee's tty name */
++};
++
++/*
++ * Server->client response message formats.
++ */
++struct otalk_response {
++	u_char	type;		/* type of request message, see below */
++	u_char	answer;		/* response to request message, see below */
++	u_char	pad;
++	u_int32_t id_num;	/* message id */
++	struct	talk_addr addr;	/* address for establishing conversation */
++};
++
++struct talk_response {
++	u_char	vers;		/* protocol version */
++	u_char	type;		/* type of request message, see below */
++	u_char	answer;		/* response to request message, see below */
++	u_char	pad;
++	u_int32_t id_num;	/* message id */
++	struct	talk_addr addr;	/* address for establishing conversation */
++};
++
++#define TALK_RESP(data, ver, member) (ver ? ((struct talk_response *)data)->member : ((struct otalk_response *)data)->member)
++#define TALK_MSG(data, ver, member) (ver ? ((struct talk_msg *)data)->member : ((struct otalk_msg *)data)->member)
++
++#define	OTALK_VERSION	0
++#define	TALK_VERSION	1		/* protocol version */
++
++/* message type values */
++#define LEAVE_INVITE	0	/* leave invitation with server */
++#define LOOK_UP		1	/* check for invitation by callee */
++#define DELETE		2	/* delete invitation by caller */
++#define ANNOUNCE	3	/* announce invitation by caller */
++
++/* answer values */
++#define SUCCESS		0	/* operation completed properly */
++#define NOT_HERE	1	/* callee not logged in */
++#define FAILED		2	/* operation failed for unexplained reason */
++#define MACHINE_UNKNOWN	3	/* caller's machine name unknown */
++#define PERMISSION_DENIED 4	/* callee's tty doesn't permit announce */
++#define UNKNOWN_REQUEST	5	/* request has invalid type value */
++#define	BADVERSION	6	/* request has invalid protocol version */
++#define	BADADDR		7	/* request has invalid addr value */
++#define	BADCTLADDR	8	/* request has invalid ctl_addr value */
++
++/* We don't really need much for talk */
++struct ip_ct_talk
++{
++	/* This tells NAT that this is a talk connection + talk version */
++	int is_talk;
++	/* Port that was to be used */
++	u_int16_t port;
++};
++
++#endif /* _IP_CONNTRACK_TALK_H */
+diff -urN --exclude-from=diff.exclude linux-2.4.4/net/ipv4/netfilter.orig/ip_conntrack_talk.c linux-2.4.4/net/ipv4/netfilter/ip_conntrack_talk.c
+--- linux-2.4.4/net/ipv4/netfilter.orig/ip_conntrack_talk.c	Thu Jan  1 01:00:00 1970
++++ linux-2.4.4/net/ipv4/netfilter/ip_conntrack_talk.c	Wed May  9 07:37:06 2001
+@@ -0,0 +1,286 @@
++/* 
++ * talk extension for IP connection tracking. 
++ * Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>
++ *
++ *      This program is free software; you can redistribute it and/or
++ *      modify it under the terms of the GNU General Public License
++ *      as published by the Free Software Foundation; either version
++ *      2 of the License, or (at your option) any later version.
++ **
++ *     Module load syntax:
++ *     insmod ip_conntrack_talk.o otalk=[0|1] talk=[0|1]
++ *
++ *     The default is otalk=1 talk=1
++ *     i.e. support both old talk and talk protocols
++ *
++ **
++ *
++ *		ASCII art on talk protocols
++ *	
++ *	
++ *	caller server		    callee server
++ *		|     \	          /
++ *		|	\       /
++ *		|	  \   /
++ *		|	    /  
++ *	 	|	  /   \
++ *	      2 |     1 /       \ 3
++ *	caller client  ----------- callee client
++ *	               		 4
++ *
++ *	1. caller client <-> callee server: LOOK_UP, then ANNOUNCE invitation 
++ *    ( 2. caller client <-> caller server: LEAVE_INVITE to server )
++ *	3. callee client <-> caller server: LOOK_UP invitation
++ *	4. callee client <-> caller client: talk data channel
++ *
++ * [1]: M. Hunter, talk: a historical protocol for interactive communication
++ *      draft-hunter-talk-00.txt
++ * [2]: D.B. Chapman, E.D. Zwicky: Building Internet Firewalls (O'Reilly)	
++ */
++#include <linux/module.h>
++#include <linux/netfilter.h>
++#include <linux/ip.h>
++#include <net/checksum.h>
++#include <net/udp.h>
++
++#include <linux/netfilter_ipv4/lockhelp.h>
++#include <linux/netfilter_ipv4/ip_conntrack_helper.h>
++#include <linux/netfilter_ipv4/ip_conntrack_talk.h>
++
++/* Default both old talk and talk are supported */
++static int otalk = 1;
++static int talk = 1;
++MODULE_AUTHOR("Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>");
++MODULE_DESCRIPTION("talk connection tracking module");
++#ifdef MODULE_PARM
++MODULE_PARM(otalk, "i");
++MODULE_PARM_DESC(otalk, "support old talk protocol");
++MODULE_PARM(talk, "i");
++MODULE_PARM_DESC(talk, "support talk protocol");
++#endif
++
++DECLARE_LOCK(ip_talk_lock);
++struct module *ip_conntrack_talk = THIS_MODULE;
++
++#if 0
++#define DEBUGP printk
++#else
++#define DEBUGP(format, args...)
++#endif
++
++static int talk_help_msg(const struct iphdr *iph, size_t len,
++		         struct ip_conntrack *ct,
++		         enum ip_conntrack_info ctinfo,
++		         int version,
++		         u_char type,
++		         struct talk_addr *addr,
++		         struct talk_addr *ctl_addr)
++{
++	int dir = CTINFO2DIR(ctinfo);
++	struct ip_conntrack_tuple t, mask;
++	struct ip_ct_talk *info = &ct->help.ct_talk_info;
++
++	DEBUGP("ip_ct_talk_help_msg: %u.%u.%u.%u:%u, ctl %u.%u.%u.%u:%u, type %d\n",
++		NIPQUAD(addr->ta_addr), ntohs(addr->ta_port),
++		NIPQUAD(ctl_addr->ta_addr), ntohs(ctl_addr->ta_port), type);
++
++	if (type != ANNOUNCE) 
++		return NF_ACCEPT;
++
++	DEBUGP("ip_ct_talk_help_msg: match, %u.%u.%u.%u:%u, ctl %u.%u.%u.%u:%u!\n",
++		NIPQUAD(addr->ta_addr), ntohs(addr->ta_port),
++		NIPQUAD(ctl_addr->ta_addr), ntohs(ctl_addr->ta_port));
++
++	/* update the talk info */
++	LOCK_BH(&ip_talk_lock);
++	info->is_talk = version ? TALK_PORT : OTALK_PORT;
++	info->port = htons(version ? TALK_PORT : OTALK_PORT);
++
++	/* expect callee client -> caller server message */
++	t = ((struct ip_conntrack_tuple)
++		{ { ct->tuplehash[!dir].tuple.src.ip,
++		    { 0 } },
++		  { ctl_addr->ta_addr,
++		    { htons(version ? TALK_PORT : OTALK_PORT) },
++		    IPPROTO_UDP }});
++	mask = ((struct ip_conntrack_tuple)
++		{ { 0xFFFFFFFF, { 0 } },
++		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
++
++	DEBUGP("ip_ct_talk_help_msg: callee client %u.%u.%u.%u:%u -> caller daemon %u.%u.%u.%u:%u!\n",
++	       NIPQUAD(t.src.ip), ntohs(t.src.u.udp.port),
++	       NIPQUAD(t.dst.ip), ntohs(t.dst.u.udp.port));
++
++	/* Ignore failure; should only happen with NAT */
++	ip_conntrack_expect_related(ct, &t, &mask, NULL);
++	UNLOCK_BH(&ip_talk_lock);
++		    
++	return NF_ACCEPT;
++}
++
++static int talk_help_response(const struct iphdr *iph, size_t len,
++		              struct ip_conntrack *ct,
++		              enum ip_conntrack_info ctinfo,
++		              int version,
++		              u_char type,
++		              u_char answer,
++		              struct talk_addr *addr)
++{
++	int dir = CTINFO2DIR(ctinfo);
++	struct ip_conntrack_tuple t, mask;
++	struct ip_ct_talk *info = &ct->help.ct_talk_info;
++
++	DEBUGP("ip_ct_talk_help_response: %u.%u.%u.%u:%u, type %d answer %d\n",
++		NIPQUAD(addr->ta_addr), ntohs(addr->ta_port),
++		type, answer);
++
++	if (!(type == LOOK_UP 
++	      && answer == SUCCESS))
++		return NF_ACCEPT;
++
++	DEBUGP("ip_ct_talk_help_response: match, %u.%u.%u.%u:%u!\n",
++		NIPQUAD(addr->ta_addr), ntohs(addr->ta_port));
++
++	/* update the talk info */
++	LOCK_BH(&ip_talk_lock);
++	info->is_talk = version ? TALK_PORT : OTALK_PORT;
++	info->port = addr->ta_port;
++
++	/* expect callee client -> caller client connection */
++	t = ((struct ip_conntrack_tuple)
++		{ { ct->tuplehash[!dir].tuple.src.ip,
++		    { 0 } },
++		  { addr->ta_addr,
++		    { addr->ta_port },
++		    IPPROTO_TCP }});
++	mask = ((struct ip_conntrack_tuple)
++		{ { 0xFFFFFFFF, { 0 } },
++		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
++	
++	DEBUGP("ip_ct_talk_help_response: callee client %u.%u.%u.%u:%u -> caller client %u.%u.%u.%u:%u!\n",
++	       NIPQUAD(t.src.ip), ntohs(t.src.u.tcp.port),
++	       NIPQUAD(t.dst.ip), ntohs(t.dst.u.tcp.port));
++
++	/* Ignore failure; should only happen with NAT */
++	ip_conntrack_expect_related(ct, &t, &mask, NULL);
++	UNLOCK_BH(&ip_talk_lock);
++		    
++	return NF_ACCEPT;
++}
++
++/* FIXME: This should be in userspace.  Later. */
++static int talk_help(const struct iphdr *iph, size_t len,
++		     struct ip_conntrack *ct,
++		     enum ip_conntrack_info ctinfo,
++		     int version)
++{
++	struct udphdr *udph = (void *)iph + iph->ihl * 4;
++	const char *data = (const char *)udph + sizeof(struct udphdr);
++	size_t udplen;
++	struct ip_ct_talk *info = &ct->help.ct_talk_info;
++
++	DEBUGP("ip_ct_talk_help: help entered\n");
++	/* Can't track connections formed before we registered */
++	if (!info)
++		return NF_ACCEPT;
++
++	/* Until there's been traffic both ways, don't look in packets. */
++	if (ctinfo != IP_CT_ESTABLISHED
++	    && ctinfo != IP_CT_ESTABLISHED + IP_CT_IS_REPLY) {
++		DEBUGP("ip_ct_talk_help: Conntrackinfo = %u\n", ctinfo);
++		return NF_ACCEPT;
++	}
++
++	/* Not whole UDP header? */
++	udplen = len - iph->ihl * 4;
++	if (udplen < sizeof(struct udphdr)) {
++		DEBUGP("ip_ct_talk_help: too short for udph, udplen = %u\n", (unsigned)udplen);
++		return NF_ACCEPT;
++	}
++
++	/* Checksum invalid?  Ignore. */
++	/* FIXME: Source route IP option packets --RR */
++	if (csum_tcpudp_magic(iph->saddr, iph->daddr, udplen, IPPROTO_UDP,
++			      csum_partial((char *)udph, udplen, 0))) {
++		DEBUGP("ip_ct_talk_help: bad csum: %p %u %u.%u.%u.%u %u.%u.%u.%u\n",
++		       udph, udplen, NIPQUAD(iph->saddr),
++		       NIPQUAD(iph->daddr));
++		return NF_ACCEPT;
++	}
++	
++	DEBUGP("ip_ct_talk_help: %u.%u.%u.%u:%u->%u.%u.%u.%u:%u\n",
++		NIPQUAD(iph->saddr), ntohs(udph->source), NIPQUAD(iph->daddr), ntohs(udph->dest));
++
++	if (udplen == sizeof(struct udphdr) 
++		      + (version ? sizeof(struct talk_msg) : sizeof(struct otalk_msg)))
++		return talk_help_msg(iph, len, ct, ctinfo, version,
++					  TALK_MSG(data, version, type), 
++					  &(TALK_MSG(data, version, addr)),
++					  &(TALK_MSG(data, version, ctl_addr)));
++	else if (udplen == sizeof(struct udphdr) 
++			   + (version ? sizeof(struct talk_response) : sizeof(struct otalk_response)))
++		return talk_help_response(iph, len, ct, ctinfo, version,
++					  TALK_RESP(data, version, type), 
++					  TALK_RESP(data, version, answer),
++					  &(TALK_RESP(data, version, addr)));
++	else {	
++		DEBUGP("ip_ct_talk_help: not talk message/response, datalen = %u\n", 
++		       (unsigned)udplen - sizeof(struct udphdr));
++		return NF_ACCEPT;
++	}
++}
++
++static int ohelp(struct sk_buff *skb,
++		 struct ip_conntrack *ct,
++		 enum ip_conntrack_info ctinfo,
++		 const struct net_device *in,
++		 const struct net_device *out)
++{
++	return talk_help(skb->nh.iph, skb->len, ct, ctinfo, OTALK_VERSION);
++}
++
++static int help(struct sk_buff *skb,
++		struct ip_conntrack *ct,
++		enum ip_conntrack_info ctinfo,
++		const struct net_device *in,
++		const struct net_device *out)
++{
++	return talk_help(skb->nh.iph, skb->len, ct, ctinfo, TALK_VERSION);
++}
++
++static struct ip_conntrack_helper talk_helpers[2] = { { { NULL, NULL },
++					        { { 0, { __constant_htons(OTALK_PORT) } },
++					          { 0, { 0 }, IPPROTO_UDP } },
++					        { { 0, { 0xFFFF } },
++					          { 0, { 0 }, 0xFFFF } },
++					        ohelp },
++                                              { { NULL, NULL },
++					        { { 0, { __constant_htons(TALK_PORT) } },
++					          { 0, { 0 }, IPPROTO_UDP } },
++					        { { 0, { 0xFFFF } },
++					          { 0, { 0 }, 0xFFFF } },
++					        help }
++					    };
++
++static int __init init(void)
++{
++	if (otalk > 0)
++		ip_conntrack_helper_register(&talk_helpers[0]);
++	if (talk > 0)
++		ip_conntrack_helper_register(&talk_helpers[1]);
++		
++	return 0;
++}
++
++static void __exit fini(void)
++{
++	if (otalk > 0)
++		ip_conntrack_helper_unregister(&talk_helpers[0]);
++	if (talk > 0)
++		ip_conntrack_helper_unregister(&talk_helpers[1]);
++}
++
++EXPORT_SYMBOL(ip_talk_lock);
++
++module_init(init);
++module_exit(fini);
+diff -urN --exclude-from=diff.exclude linux-2.4.4/net/ipv4/netfilter.orig/ip_nat_talk.c linux-2.4.4/net/ipv4/netfilter/ip_nat_talk.c
+--- linux-2.4.4/net/ipv4/netfilter.orig/ip_nat_talk.c	Thu Jan  1 01:00:00 1970
++++ linux-2.4.4/net/ipv4/netfilter/ip_nat_talk.c	Wed May  9 07:38:03 2001
+@@ -0,0 +1,391 @@
++/* 
++ * talk extension for UDP NAT alteration. 
++ * Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>
++ *
++ *      This program is free software; you can redistribute it and/or
++ *      modify it under the terms of the GNU General Public License
++ *      as published by the Free Software Foundation; either version
++ *      2 of the License, or (at your option) any later version.
++ **
++ *     Module load syntax:
++ *     insmod ip_nat_talk.o otalk=[0|1] talk=[0|1]
++ *
++ *     The default is otalk=1 talk=1
++ *     i.e. support both old talk and talk protocols
++ *
++ *  
++ */
++#include <linux/module.h>
++#include <linux/netfilter_ipv4.h>
++#include <linux/ip.h>
++#include <linux/udp.h>
++#include <linux/kernel.h>
++#include <net/tcp.h>
++#include <net/udp.h>
++
++#include <linux/netfilter_ipv4/ip_nat.h>
++#include <linux/netfilter_ipv4/ip_nat_helper.h>
++#include <linux/netfilter_ipv4/ip_nat_rule.h>
++#include <linux/netfilter_ipv4/ip_conntrack_talk.h>
++#include <linux/netfilter_ipv4/ip_conntrack_helper.h>
++
++/* Default both old talk and talk are supported */
++static int otalk = 1;
++static int talk = 1;
++
++MODULE_AUTHOR("Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>");
++MODULE_DESCRIPTION("talk network address translation module");
++#ifdef MODULE_PARM
++MODULE_PARM(otalk, "i");
++MODULE_PARM_DESC(otalk, "support old talk protocol");
++MODULE_PARM(talk, "i");
++MODULE_PARM_DESC(talk, "support talk protocol");
++#endif
++
++DECLARE_LOCK_EXTERN(ip_talk_lock);
++
++#if 0
++#define DEBUGP printk
++#define IP_NAT_TALK_DEBUG
++#else
++#define DEBUGP(format, args...)
++#endif
++
++/* FIXME: Time out? --RR */
++
++static int
++talk_nat_expected(struct sk_buff **pskb,
++		  unsigned int hooknum,
++		  struct ip_conntrack *ct,
++		  struct ip_nat_info *info,
++		  struct ip_conntrack *master,
++		  struct ip_nat_info *masterinfo,
++		  unsigned int *verdict)
++{
++	struct ip_nat_multi_range mr;
++	u_int32_t newdstip, newsrcip, newip;
++	struct ip_ct_talk *talkinfo;
++
++	IP_NF_ASSERT(info);
++	IP_NF_ASSERT(master);
++	IP_NF_ASSERT(masterinfo);
++
++	IP_NF_ASSERT(!(info->initialized & (1<<HOOK2MANIP(hooknum))));
++
++	DEBUGP("talk_nat_expected: We have a connection!\n");
++	/* Master must be an talk connection */
++	talkinfo = &master->help.ct_talk_info;
++
++	LOCK_BH(&ip_talk_lock);
++	if (!(talkinfo->is_talk == TALK_PORT || talkinfo->is_talk == OTALK_PORT)) {
++		UNLOCK_BH(&ip_talk_lock);
++		DEBUGP("talk_nat_expected: master not talk\n");
++		return 0;
++	}
++	UNLOCK_BH(&ip_talk_lock);
++	DEBUGP("talk_nat_expected: dir %s at hook %s, ct %p, master %p\n",
++	       CTINFO2DIR((*pskb)->nfct - ct->infos) == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY",
++	       hooknum == NF_IP_POST_ROUTING ? "POSTROUTING"
++	       : hooknum == NF_IP_PRE_ROUTING ? "PREROUTING"
++	       : hooknum == NF_IP_LOCAL_OUT ? "OUTPUT" : "???",
++	       ct, master);
++
++	if (ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == IPPROTO_UDP) {
++		/* Callee client -> caller server */
++#ifdef IP_NAT_TALK_DEBUG
++		struct iphdr *iph = (*pskb)->nh.iph;
++		struct udphdr *udph = (void *)iph + iph->ihl * 4;
++
++		DEBUGP("talk_nat_expected: UDP %u.%u.%u.%u:%u->%u.%u.%u.%u:%u\n",
++		       NIPQUAD(iph->saddr), ntohs(udph->source),
++		       NIPQUAD(iph->daddr), ntohs(udph->dest));
++#endif
++		newdstip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
++		newsrcip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
++		DEBUGP("talk_nat_expected: callee client -> caller server, newsrc: %u.%u.%u.%u, newdst: %u.%u.%u.%u\n",
++		       NIPQUAD(newsrcip), NIPQUAD(newdstip));
++	} else {
++		/* Callee client -> caller client */
++#ifdef IP_NAT_TALK_DEBUG
++		struct iphdr *iph = (*pskb)->nh.iph;
++		struct tcphdr *tcph = (void *)iph + iph->ihl * 4;
++
++		DEBUGP("talk_nat_expected: TCP %u.%u.%u.%u:%u->%u.%u.%u.%u:%u\n",
++		       NIPQUAD(iph->saddr), ntohs(tcph->source),
++		       NIPQUAD(iph->daddr), ntohs(tcph->dest));
++#endif
++		newdstip = master->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip;
++		newsrcip = master->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip;
++		DEBUGP("talk_nat_expected: callee client -> caller client, newsrc: %u.%u.%u.%u, newdst: %u.%u.%u.%u\n",
++		       NIPQUAD(newsrcip), NIPQUAD(newdstip));
++	}
++	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
++		newip = newsrcip;
++	else
++		newip = newdstip;
++
++	DEBUGP("talk_nat_expected: IP to %u.%u.%u.%u, port %u\n", NIPQUAD(newip), ntohs(talkinfo->port));
++
++	mr.rangesize = 1;
++	/* We don't want to manip the per-protocol, just the IPs... */
++	mr.range[0].flags = IP_NAT_RANGE_MAP_IPS;
++	mr.range[0].min_ip = mr.range[0].max_ip = newip;
++
++	*verdict = ip_nat_setup_info(ct, &mr, hooknum);
++
++
++	return 1;
++}
++
++static int
++mangle_packet(struct sk_buff **pskb,
++	      u_int32_t newip,
++	      u_int16_t port,
++	      struct talk_addr *addr,
++	      struct talk_addr *ctl_addr)
++{
++	struct iphdr *iph = (*pskb)->nh.iph;
++	struct udphdr *udph = (void *)iph + iph->ihl * 4;
++	size_t udplen;
++
++	/* response: no success || msg in DNAT  */
++	if (addr->ta_addr == INADDR_ANY || addr->ta_addr == newip)
++		return 1;
++	
++	MUST_BE_LOCKED(&ip_talk_lock);
++
++	udplen = (*pskb)->len - iph->ihl * 4;
++
++	/* Fortunately talk sends a structure with the address and
++	   port in it. The size of the packet won't change. */
++
++	addr->ta_addr = newip;
++	if (ctl_addr != NULL) {
++		ctl_addr->ta_addr = newip;
++		ctl_addr->ta_port = port;
++	}
++
++	DEBUGP("talk_mangle_packet: orig %u.%u.%u.%u, inserting %u.%u.%u.%u:%u\n", 
++	       NIPQUAD(addr->ta_addr), NIPQUAD(newip), ntohs(port));
++
++	/* Fix checksums */
++	(*pskb)->csum = csum_partial((char *)udph + sizeof(struct udphdr), udplen - sizeof(struct udphdr), 0);
++	udph->check = 0;
++	udph->check = csum_tcpudp_magic(iph->saddr, iph->daddr, udplen, IPPROTO_UDP,
++				        csum_partial((char *)udph, sizeof(struct udphdr), (*pskb)->csum));
++		
++	ip_send_check(iph);
++	return 1;
++}
++
++static int talk_help_msg(struct ip_conntrack *ct,
++			 struct sk_buff **pskb,
++		         u_char type,
++		         struct talk_addr *addr,
++		         struct talk_addr *ctl_addr)
++{
++	u_int32_t newip;
++	u_int16_t port;
++	
++	unsigned int verdict = NF_ACCEPT;
++
++	DEBUGP("talk_help_msg: addr: %u.%u.%u.%u:%u, ctl_addr: %u.%u.%u.%u:%u, type %d\n",
++		NIPQUAD(addr->ta_addr), ntohs(addr->ta_port),
++		NIPQUAD(ctl_addr->ta_addr), ntohs(ctl_addr->ta_port),
++		type);
++
++	/* Change address inside packet to match way we're mapping
++	   this connection. */
++	newip = ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip;
++	port  = ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.u.udp.port;
++
++	DEBUGP("talk_help_msg: inserting: %u.%u.%u.%u:%u\n",
++		NIPQUAD(newip), ntohs(port));
++		
++	if (!mangle_packet(pskb, newip, port, addr, ctl_addr))
++		verdict = NF_DROP;
++
++	return verdict;
++}
++
++static int talk_help_response(struct ip_conntrack *ct,
++			      struct sk_buff **pskb,
++		              u_char type,
++		              u_char answer,
++		              struct talk_addr *addr)
++{
++	u_int32_t newip;
++	u_int16_t port;
++	struct ip_conntrack_tuple t;
++	struct ip_ct_talk *talkinfo;
++	unsigned int verdict = NF_ACCEPT;
++
++	DEBUGP("talk_help_response: addr: %u.%u.%u.%u:%u, type %d answer %d\n",
++		NIPQUAD(addr->ta_addr), ntohs(addr->ta_port),
++		type, answer);
++	
++	LOCK_BH(&ip_talk_lock);
++	talkinfo = &ct->help.ct_talk_info;
++	
++	/* Callee server -> caller client && not simultaneous talk request */
++	if (talkinfo->port == 0) {
++		UNLOCK_BH(&ip_talk_lock);
++		return verdict;
++	}
++		
++	DEBUGP("talk_help_response: talkinfo port %u\n", ntohs(talkinfo->port));
++
++	/* Change address inside packet to match way we're mapping
++	   this connection. */
++	newip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
++	/* We can read expect here without conntrack lock, since it's
++	   only set in ip_conntrack_talk , with ip_talk_lock held
++	   writable */ 
++	t = ct->expected.tuple;
++	t.dst.ip = newip;
++
++	/* Try to get same port: if not, try to change it. */
++	for (port = ntohs(talkinfo->port); port != 0; port++) {
++		t.dst.u.tcp.port = htons(port);
++
++		if (ip_conntrack_expect_related(ct, &t,
++						&ct->expected.mask, 
++						NULL) == 0) {
++			DEBUGP("talk_help_response: using %u.%u.%u.%u:%u\n", NIPQUAD(newip), ntohs(port));
++			break;
++		}
++	}
++	UNLOCK_BH(&ip_talk_lock);
++
++	if (port == 0 || !mangle_packet(pskb, newip, port, addr, NULL))
++		verdict = NF_DROP;
++	
++	return verdict;
++}
++
++static unsigned int talk_help(struct ip_conntrack *ct,
++			      struct ip_nat_info *info,
++			      enum ip_conntrack_info ctinfo,
++			      unsigned int hooknum,
++			      struct sk_buff **pskb,
++			      int version)
++{
++	struct iphdr *iph = (*pskb)->nh.iph;
++	struct udphdr *udph = (void *)iph + iph->ihl * 4;
++	unsigned int udplen = (*pskb)->len - iph->ihl * 4;
++	char *data = (char *)udph + sizeof(struct udphdr);
++	int dir;
++
++	/* Only mangle things once: original direction in POST_ROUTING
++	   and reply direction on PRE_ROUTING. */
++	dir = CTINFO2DIR(ctinfo);
++	if (!((hooknum == NF_IP_POST_ROUTING && dir == IP_CT_DIR_ORIGINAL)
++	      || (hooknum == NF_IP_PRE_ROUTING && dir == IP_CT_DIR_REPLY))) {
++		DEBUGP("talk_help: Not touching dir %s at hook %s\n",
++		       dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY",
++		       hooknum == NF_IP_POST_ROUTING ? "POSTROUTING"
++		       : hooknum == NF_IP_PRE_ROUTING ? "PREROUTING"
++		       : hooknum == NF_IP_LOCAL_OUT ? "OUTPUT" : "???");
++		return NF_ACCEPT;
++	}
++	DEBUGP("talk_help: dir %s at hook %s, %u.%u.%u.%u:%u->%u.%u.%u.%u:%u, version %d\n",
++	       dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY",
++	       hooknum == NF_IP_POST_ROUTING ? "POSTROUTING"
++	       : hooknum == NF_IP_PRE_ROUTING ? "PREROUTING"
++	       : hooknum == NF_IP_LOCAL_OUT ? "OUTPUT" : "???",
++	       NIPQUAD(iph->saddr), ntohs(udph->source),
++	       NIPQUAD(iph->daddr), ntohs(udph->dest),
++	       version);
++
++	if (udplen == sizeof(struct udphdr) 
++		      + (version ? sizeof(struct talk_msg) : sizeof(struct otalk_msg)))
++		return talk_help_msg(ct, pskb,
++				     TALK_MSG(data, version, type), 
++				     &(TALK_MSG(data, version, addr)),
++				     &(TALK_MSG(data, version, ctl_addr)));
++	else if (udplen == sizeof(struct udphdr) 
++			   + (version ? sizeof(struct talk_response) : sizeof(struct otalk_response)))
++		return talk_help_response(ct, pskb,
++					  TALK_RESP(data, version, type), 
++					  TALK_RESP(data, version, answer),
++					  &(TALK_RESP(data, version, addr)));
++	else {	
++		DEBUGP("talk_help: not talk message/response, datalen = %u\n", (unsigned)udplen - sizeof(struct udphdr));
++		return NF_DROP;
++	}
++}
++
++static unsigned int ohelp(struct ip_conntrack *ct,
++			  struct ip_nat_info *info,
++			  enum ip_conntrack_info ctinfo,
++			  unsigned int hooknum,
++			  struct sk_buff **pskb)
++{
++	return talk_help(ct, info, ctinfo, hooknum, pskb, OTALK_VERSION);
++}
++
++static unsigned int help(struct ip_conntrack *ct,
++			 struct ip_nat_info *info,
++			 enum ip_conntrack_info ctinfo,
++			 unsigned int hooknum,
++			 struct sk_buff **pskb)
++{
++	return talk_help(ct, info, ctinfo, hooknum, pskb, TALK_VERSION);
++}
++
++static struct ip_nat_helper talk_helpers[2] = { { { NULL, NULL },
++				          { { 0, { __constant_htons(OTALK_PORT) } },
++				            { 0, { 0 }, IPPROTO_UDP } },
++				          { { 0, { 0xFFFF } },
++				            { 0, { 0 }, 0xFFFF } },
++				          ohelp, "otalk" },
++					{ { NULL, NULL },
++				          { { 0, { __constant_htons(TALK_PORT) } },
++				            { 0, { 0 }, IPPROTO_UDP } },
++				        { { 0, { 0xFFFF } },
++				          { 0, { 0 }, 0xFFFF } },
++				          help, "talk" } };
++static struct ip_nat_expect talk_expect
++= { { NULL, NULL }, talk_nat_expected };
++
++static int __init init(void)
++{
++	int ret = 0;
++
++	if (otalk > 0 || talk > 0)
++		ret = ip_nat_expect_register(&talk_expect);
++	if (ret != 0)
++		return ret;
++		
++	if (otalk > 0) {
++		ret = ip_nat_helper_register(&talk_helpers[0]);
++
++		if (ret != 0) {
++			ip_nat_expect_unregister(&talk_expect);
++			return ret;
++		}
++	}
++	if (talk > 0) {
++		ret = ip_nat_helper_register(&talk_helpers[1]);
++
++		if (ret != 0) {
++			if (otalk > 0)
++				ip_nat_helper_unregister(&talk_helpers[0]);
++			ip_nat_expect_unregister(&talk_expect);
++		}	
++	}
++	return ret;
++}
++
++static void __exit fini(void)
++{
++	if (otalk > 0)
++		ip_nat_helper_unregister(&talk_helpers[0]);
++	if (talk > 0)
++		ip_nat_helper_unregister(&talk_helpers[1]);
++	if (otalk > 0 || talk > 0) 
++		ip_nat_expect_unregister(&talk_expect);
++}
++
++module_init(init);
++module_exit(fini);

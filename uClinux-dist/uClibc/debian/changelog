@@ -1,0 +1,62 @@
+uclibc (0.9.9-cvs20020210-1) unstable; urgency=low
+
+  * New upstream snapshot.
+  * debian/mksnapshot: updated version and filenames
+  * debian/control.in: changed dependency from kernel-headers to
+      kernel-source.
+  * debian/rules: force HAS_MMU=true
+  * debian/rules: change mipsel to mips
+  * debian/rules: untar kernel-source include directory and use
+      that as kernel source.
+  * Previous 3 lines should fix autobuildability (Closes: #131373)
+
+ -- David Schleef <ds@schleef.org>  Sun, 10 Feb 2002 17:11:22 -0800
+
+uclibc (0.9.5-cvs20011117-1) unstable; urgency=low
+
+  * New upstream snaphot
+  * mksnapshot (new): script to generate snapshots from upstream CVS
+  * control, control.in: limited architectures to those that can
+      theoretically build.  Updated kernel-headers dependency to
+      -2.4.10 -- this may cause problems with autobuilders.
+  * fixlinks (new): script to fix up symlinks to comply with policy.
+      Decreases number of lintian complaints.
+  * rules: use fixlinks.  Fix method of finding kernel headers --
+      should increase potential autobuildability.
+  * uclibc-ldd.1, uclibc-readelf.1: Bogus updates to bogus man pages.
+      These really need to be written.
+
+ -- David Schleef <ds@schleef.org>  Sat, 17 Nov 2001 18:10:33 -0800
+
+uclibc (0.9.5-cvs20011011-1) unstable; urgency=low
+
+  * Closes #104243
+
+ -- David Schleef <ds@schleef.org>  Thu, 11 Oct 2001 13:29:02 -0700
+
+uclibc (0.9.5-cvs20010702-1) unstable; urgency=low
+
+  * Build from CVS
+  * Can create cross-compiling library (but not cross packages)
+
+ -- David Schleef <ds@schleef.org>  Mon,  2 Jul 2001 23:16:20 -0700
+
+uclibc (0.9.5-cvs20010630-1) unstable; urgency=low
+
+  * No, really.  Initial Release.  I mean it this time.
+  * Clean up patch.
+
+ -- David Schleef <ds@schleef.org>  Sat, 30 Jun 2001 17:12:41 -0700
+
+uclibc (0.9.5-cvs20010626-1) unstable; urgency=low
+
+  * No, really.  Initial Release.
+
+ -- David Schleef <ds@schleef.org>  Thu, 28 Jun 2001 16:49:25 -0700
+
+uclibc (0.9.5-cvs20010625-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- David Schleef <ds@schleef.org>  Mon, 25 Jun 2001 22:13:43 -0700
+

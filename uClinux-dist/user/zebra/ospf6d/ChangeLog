@@ -1,0 +1,166 @@
+2000-04-28  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6d.h: Include some headers for avoid warning.
+
+	* ospf6_routemap.h: Add newfile.
+
+1999-11-21  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_network.c: Respect IPV6_JOIN_GROUP and IPV6_LEAVE_GROUP
+	rather than RFC2133.
+
+1999-10-21  Jun-ichiro itojun Hagino <itojun@itojun.org>
+
+	* ospf6_network.c (ospf6_ipv6_decode_ipv4): Fix bug of conversion
+	from IPv4 Mapped Address to IPv4 address.
+
+1999-08-08  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_lsa.c (construct_link_lsa): Enclose KAME specific part by
+	#ifdef/#endif.
+
+1999-07-29  Yasuhiro Ohara  <yasu@sfc.wide.ad.jp>
+
+	* ospf6_mesg.c: add new message process function.
+
+1999-07-25  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_main.c (sighup): Call of log_rotate() removed.
+
+1999-07-24  Yasuhiro Ohara  <yasu@sfc.wide.ad.jp>
+
+	ospf6_dbex.{c,h}: variable "acknowledge" has been deleted.
+
+1999-07-22  Yasuhiro Ohara  <yasu@sfc.wide.ad.jp>
+
+	* *.{c,h}: lsa data structure has been drastically
+	changed.
+
+1999-07-16  Yasuhiro Ohara  <yasu@sfc.wide.ad.jp>
+
+	* *.{c,h}: bug of updating LSA's which is self
+	originated has been fixed.
+
+1999-07-14  Yasuhiro Ohara  <yasu@sfc.wide.ad.jp>
+
+	* *.{c,h} : log clean up.
+
+1999-07-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6d.c (ospf6_init): Change to use install_default.
+
+1999-07-03  Yasuhiro Ohara <yasu@sfc.wide.ad.jp>
+
+	* ospf6_rtable.c (nexthop_*): added some function that handles
+	new nexthop structure.
+
+1999-07-01  Rick Payne <rickp@rossfell.co.uk>
+
+	* ospf6_zebra.c (ospf6_zebra_init): Install standard commands to
+	ZEBRA_NODE.
+
+1999-06-09  Yasuhiro Ohara <yasu@sfc.wide.ad.jp>
+
+	* ospf6_rtable.h: added for new routing table of ospf6d
+
+1999-05-14  Stephen R. van den Berg <srb@cuci.nl>
+
+	* ospf6_main.c (signal_init): SIGTERM call sigint.
+	(sigint): Loggging more better message.
+
+1999-05-13  Yasuhiro Ohara <yasu@sfc.wide.ad.jp>
+
+	*ospf6_spf.c (get_prefix_lsa_of_vertex): bug fix about network vertex.
+
+1999-05-08  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_network.c (send_linkstate_ack): Check HAVE_SIN6_SCOPE_ID
+	is defined.
+	* ospf6_mesg.c (make_hello): Likewise.
+	* ospf6_lsa.c (lsa_flood): Likewise.
+
+1999-05-07  Yasuhiro Ohara <yasu@sfc.wide.ad.jp>
+
+	* ospf6_spf.c, etc: Many bug fix.
+        intra-area-prefix-LSA treatment changed.
+        network byte order of neighbor ifid changed.
+
+1999-05-07  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_zebra.h (struct zebra): Add hitory entry to structure.
+
+1999-05-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_main.c (main): Add KAME check for binding vty socket.
+	(main): Delete old interface get routine garbage.
+
+	* ospf6d.c: Change all `show ip6' statement to `show ipv6'.
+	(show_ipv6_ospf6_requestlist): Add description.
+
+1999-05-04  Yasuhiro Ohara <yasu@sfc.wide.ad.jp>
+
+	* ospf6_lsa.c, etc: Many bug fix, now two routers
+	on the same segment can become FULL neighbor state
+	each other.
+
+1999-05-03  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* Makefile.am: Add file dependency.
+	(depend): Add target.
+
+1999-05-02  Yasuhiro Ohara <yasu@sfc.wide.ad.jp>
+
+	* Clean up and fix have been almost done. This code
+	now testing stage of Intra area routing.
+
+	* Configuration Vty become more similar to Cisco.
+
+1999-04-22  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* Trim training newline from zlog format arguemnt.
+	
+	* ospf6_dump.c (ospf6_err): Commented out ospf6_err and
+	ospf6_warn.  Same kind of function should be implemented as
+	zlog_err or zlog_warn or someting.
+
+	* ospf6d.c: Change OSPF_NODE to OSPF6_NODE.
+	Change OSPF_DEFAULT_CONFIG to OSPF6_DEFAULT_CONFIG.
+	
+
+1999-04-21  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_mesg.c (make_hello): Add check of SIN6_LEN
+
+1999-04-16  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* ospf6_neighbor.c: Change list_clear_all to list_delete_all_node.
+	Remove list_delete_all fuction and use lib/linklist.c's one.
+	
+1999-04-14  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* mcast_join(),mcast_leave()'s argument socket length is removed.
+
+1999-04-08    <kunihiro@zebra.org>
+
+	* ospf6_zebra.h (ospf_zebra_read): Fix typo.
+
+	* ospf6_interface.h: Tempolary add struct rt_addrinfo.
+
+1999-03-05  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* Merge from ospfd-zebra-990303 codes.
+
+1999-02-23  Kunihiro Ishiguro  <kunihiro@zebra.org>
+
+	* Makefile.in: add new file.
+
+	* Makefile.am: @INCLUDES@ is added for OS/library specific IPv6
+	directory search.
+
+	* Import files from Yasuhiro Ohara <yasu@sfc.wide.ad.jp>'s ospfd.
+	Impterted files are:
+	Makefile.am, ospf_area.h, ospf_dump.c, ospf_interface.c,
+	ospf_interface.h, ospf_lsa.c, ospf_lsa.h, ospf_main.c,
+	ospf_mesg.c, ospf_mesg.h, ospf_neighbor.c,
+	ospf_neighbor.h,ospf_network.c, ospf_network.h, ospf_proto.h,
+	ospf_spf.c, ospf_spf.h, ospf_types.h, ospfd.c, ospfd.h

@@ -1,0 +1,7 @@
+Author: Michal Ludvig <michal@logix.cz>
+Status: It works
+
+This patch allows you to match packet in accrodance 
+to its "class", eg. BROADCAST, MULTICAST, ...
+
+iptables -A INPUT -m pkttype --pkt-type broadcast -j LOG

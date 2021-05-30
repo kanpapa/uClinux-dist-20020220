@@ -1,0 +1,69 @@
+diff -Nur linux-2.4.7-fresh/include/linux/netfilter_ipv6/ip6t_length.h linux-2.4.7-nf/include/linux/netfilter_ipv6/ip6t_length.h
+--- linux-2.4.7-fresh/include/linux/netfilter_ipv6/ip6t_length.h	Thu Jan  1 05:30:00 1970
++++ linux-2.4.7-nf/include/linux/netfilter_ipv6/ip6t_length.h	Sun Aug 12 16:22:46 2001
+@@ -0,0 +1,10 @@
++#ifndef _IP6T_LENGTH_H
++#define _IP6T_LENGTH_H
++
++struct ip6t_length_info {
++	u_int16_t  min, max;
++	u_int8_t   invert;
++};
++
++#endif /*_IP6T_LENGTH_H*/
++	
+diff -Nur linux-2.4.7-fresh/net/ipv6/netfilter/ip6t_length.c linux-2.4.7-nf/net/ipv6/netfilter/ip6t_length.c
+--- linux-2.4.7-fresh/net/ipv6/netfilter/ip6t_length.c	Thu Jan  1 05:30:00 1970
++++ linux-2.4.7-nf/net/ipv6/netfilter/ip6t_length.c	Sun Aug 12 16:25:25 2001
+@@ -0,0 +1,51 @@
++/* Length Match - IPv6 Port */
++
++#include <linux/module.h>
++#include <linux/skbuff.h>
++#include <linux/netfilter_ipv6/ip6t_length.h>
++#include <linux/netfilter_ipv6/ip6_tables.h>
++
++static int
++match(const struct sk_buff *skb,
++      const struct net_device *in,
++      const struct net_device *out,
++      const void *matchinfo,
++      int offset,
++      const void *hdr,
++      u_int16_t datalen,
++      int *hotdrop)
++{
++	const struct ip6t_length_info *info = matchinfo;
++	u_int16_t pktlen = ntohs(skb->nh.ipv6h->payload_len) + sizeof(struct ipv6hdr);
++	
++	return (pktlen >= info->min && pktlen <= info->max) ^ info->invert;
++}
++
++static int
++checkentry(const char *tablename,
++           const struct ip6t_ip6 *ip,
++           void *matchinfo,
++           unsigned int matchsize,
++           unsigned int hook_mask)
++{
++	if (matchsize != IP6T_ALIGN(sizeof(struct ip6t_length_info)))
++		return 0;
++
++	return 1;
++}
++
++static struct ip6t_match length_match
++= { { NULL, NULL }, "length", &match, &checkentry, NULL, THIS_MODULE };
++
++static int __init init(void)
++{
++	return ip6t_register_match(&length_match);
++}
++
++static void __exit fini(void)
++{
++	ip6t_unregister_match(&length_match);
++}
++
++module_init(init);
++module_exit(fini);

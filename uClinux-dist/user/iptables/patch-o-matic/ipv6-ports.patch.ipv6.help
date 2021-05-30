@@ -1,0 +1,5 @@
+Author: Jan Rekorajski <baggins@pld.org.pl>
+Status: In Development (should be stable)
+
+Contains IPv6 port of owner match form IPv4 and fixes for limit, mac
+and multiport matches.

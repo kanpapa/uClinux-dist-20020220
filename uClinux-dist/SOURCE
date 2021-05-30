@@ -1,0 +1,41 @@
+
+uClinux/distribution SOURCE
+---------------------------
+
+The sources in this build have come from many places.
+Primarily from www.uclinux.org and cvs.uclinux.org
+
+
+The directories:
+
+linux    -- uClinux sources from cvs.uclinux.org
+            FreeSWAN 1.8 from www.freeswan.org
+
+lib      -- User application libraries. Includes libc, libm and others.
+            libc is uC-libc from www.uclinux.org
+            libm is uC-libm from www.uclinux.org
+
+user     -- User mode applications, source from many places.
+            Too many places to enumerate, many are standard GNU/Linux
+            packages, all are freely available on the net somewhere.
+
+
+The following directories hold results of the build process:
+
+config   -- Basically a version of the linux config scripts that are
+            used to drive the vendor/platform configuration.
+
+vendors  -- holds plaform specific build information or support files.
+            This is also the location where default build configurations
+            are kept for each of the supported platforms.
+
+romfs    -- Is the structrue of the ROM based file system. Mostly it
+            holds the user application binaries, but also has device nodes.
+
+images   -- Contains the final build binaries of the kernel, ROM file
+            system, and the complete combined image.
+
+
+Visit www.uclinux.com to order the very latest uClinux releases on CD-ROM.
+
+

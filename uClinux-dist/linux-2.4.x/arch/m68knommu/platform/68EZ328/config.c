@@ -85,7 +85,7 @@ void BSP_reset (void)
 {
   cli();
   asm volatile ("
-    moveal #0x10c00000, %a0;
+    moveal #0x10000000, %a0;
     moveb #0, 0xFFFFF300;
     moveal 0(%a0), %sp;
     moveal 4(%a0), %a0;
@@ -109,6 +109,7 @@ void config_BSP(char *command, int len)
   printk("\n68EZ328 DragonBallEZ support (C) 1999 Rt-Control, Inc\n");
 
 #ifdef CONFIG_UCSIMM
+/***
   printk("uCsimm serial string [%s]\n",getserialnum());
   p = cs8900a_hwaddr = gethwaddr(0);
   printk("uCsimm hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
@@ -122,6 +123,8 @@ void config_BSP(char *command, int len)
   p = getbenv("APPEND");
   if (p) strcpy(p,command);
   else command[0] = 0;
+***/
+  command[0] = 0;
 #endif
  
   mach_sched_init      = BSP_sched_init;

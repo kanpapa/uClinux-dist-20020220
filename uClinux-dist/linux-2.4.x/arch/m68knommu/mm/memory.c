@@ -1051,7 +1051,8 @@ int is_in_rom(unsigned long addr)
 #endif
 
 #if defined(CONFIG_PILOT) || defined(CONFIG_UCSIMM)
-	if (addr >= 0x10c00000)
+/*	if (addr >= 0x10c00000) */
+	if (addr >= 0x10000000)
 		return 1;
 #endif
 

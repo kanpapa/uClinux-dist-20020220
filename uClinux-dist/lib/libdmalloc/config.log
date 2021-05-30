@@ -1,0 +1,101 @@
+This file contains any messages produced by compilers while
+running configure, to aid debugging if configure makes a mistake.
+
+configure:529: checking configurations for the dmalloc library
+configure:553: checking build utilities
+configure:558: checking for gcc
+configure:635: checking whether the C compiler (gcc  ) works
+configure:649: gcc -o conftest    conftest.c  1>&5
+configure:669: checking whether the C compiler (gcc  ) is a cross-compiler
+configure:674: checking whether we are using GNU C
+configure:698: checking whether gcc accepts -g
+configure:730: checking for c++
+configure:761: checking whether the C++ compiler (c++  ) works
+configure:775: c++ -o conftest    conftest.C  1>&5
+configure:801: checking whether the C++ compiler (c++  ) is a cross-compiler
+configure:806: checking whether we are using GNU C++
+configure:862: checking C++ support
+configure:881: checking thread support
+configure:898: checking ANSI compiler flags
+configure:1017: checking for a BSD compatible install
+configure:1069: checking for ranlib
+configure:1096: checking for working const
+configure:1179: checking how to run the C preprocessor
+configure:1240: checking for ANSI C header files
+configure:1347: checking for stdarg.h
+configure:1393: checking for stdlib.h
+configure:1439: checking for string.h
+configure:1485: checking for unistd.h
+configure:1531: checking for sys/types.h
+configure:1577: checking for sys/mman.h
+configure:1624: checking for size_t
+configure:1668: checking dmalloc size unsigned
+configure:1718: checking strdup macro
+configure:1763: checking for mprotect
+configure:1816: checking memory protection
+configure:1867: checking important functionality
+configure:1871: checking for sbrk
+configure:1931: checking heap growing up
+configure:1996: checking for getpagesize
+configure:2049: checking basic-block size in bits
+configure:2162: checking size of long
+configure:2201: checking data-alignment size
+configure:2223: checking for abort
+configure:2276: checking abort safety
+configure:2355: checking return type of signal handlers
+configure:2396: checking signal usage
+configure:2458: checking return.h macros work
+configure:2519: checking pthread particulars
+configure:2525: checking for pthread_mutex_init in -lpthread
+configure:2573: checking for pthread_mutex_init in -lpthreads
+configure:2624: checking for pthread.h
+configure:2670: checking for pthreads.h
+configure:2717: checking for pthread_mutex_init
+configure:2717: checking for pthread_mutex_lock
+configure:2717: checking for pthread_mutex_unlock
+configure:2771: checking pthread mutex type
+configure:2810: checking pthread attribute initialization
+configure:2854: checking functions
+configure:2860: checking for atexit
+configure:2860: checking for on_exit
+configure:2925: checking for fork
+configure:2925: checking for getpid
+configure:2925: checking for time
+configure:2925: checking for ctime
+configure:2925: checking for random
+configure:2980: checking for vprintf
+configure:2980: checking for snprintf
+configure:2980: checking for vsnprintf
+configure:3035: checking for recalloc
+configure:3035: checking for memalign
+configure:3035: checking for valloc
+configure:3092: checking for memcmp
+configure:3092: checking for memcpy
+configure:3092: checking for memset
+configure:3147: checking for strchr
+configure:3147: checking for strrchr
+configure:3202: checking for strcat
+configure:3202: checking for strlen
+configure:3202: checking for strcmp
+configure:3202: checking for strcpy
+configure:3202: checking for strsep
+configure:3257: checking various functions for argv files
+configure:3263: checking for strncmp
+configure:3263: checking for strncpy
+configure:3318: checking various functions for argument checking
+configure:3323: checking for bcmp
+configure:3323: checking for bcopy
+configure:3323: checking for bzero
+configure:3378: checking for memccpy
+configure:3378: checking for memchr
+configure:3434: checking for index
+configure:3434: checking for rindex
+configure:3434: checking for strcasecmp
+configure:3434: checking for strncasecmp
+configure:3489: checking for strdup
+configure:3489: checking for strspn
+configure:3489: checking for strcspn
+configure:3489: checking for strncat
+configure:3489: checking for strpbrk
+configure:3489: checking for strstr
+configure:3489: checking for strtok

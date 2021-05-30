@@ -1,0 +1,160 @@
+
+uClinux/distribution
+====================
+
+Contents
+--------
+
+1) Instructions for compiling
+2) Changing the Applications/Kernel options/Libraries
+3) Building for debugging
+4) Layout of the source
+5) Adding a platform
+6) Adding an application
+7) FAQ
+
+
+1) Instructions for compiling
+-----------------------------
+
+  1. You will need a cross-compiler package for your target. Many binary
+     tools packages exists specifically for compiling uClinux. Install
+     that in the standard way first. For example, if you are targeting m68k
+     or ColdFire systems then you can use the m68k-elf-tools binary
+     packages of www.uclinux.org.
+  
+  2. If you have not un-archived the source package then do that now.
+     It is a gziped tar image, so do:
+  
+       tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+  
+     This will dump the source into a "uClinux-dist" directory.
+     You can do this into any directory, typically use your own user
+     login. (I don't recommend devloping as root, it is a bad pactice,
+     and it will bite you one day!)
+  
+  3. Cd into the source tree:
+  
+          cd uClinux-dist
+  
+  4. Configure the build target:
+  
+          make xconfig
+  
+     You can also use "make config" or "make menuconfig" if you prefer.
+  
+     The top level selection is straight forward if you know the vendor of
+     the board you want to compile for. You can choose also to modify the
+     underlying default kernel and application configuration if you want.
+  
+     At first it is suggested that you use the default configuration for
+     your target board. It will almost certainly work "as is" on your board.
+  
+     Based on what platform you choose in this step the build will generate
+     an appropriate default application set.
+
+	 Sometimes a number of questions will appear after you 'Save and Exit'.
+	 Do not be concerned,  it just means that some new config options have
+	 been added to the source tree that do not have defaults for the
+	 configuration you have chosen.  If this happens the safest option is
+	 to answer 'N' to each question as they appear.
+  
+  5. Build the dependencies:
+  
+          make dep
+  
+  6. Build the image:
+  
+          make
+  
+  
+  Thats it!
+  
+  The make will generate appropriate binary images for the target harwdare
+  specified. The exact files vary from target to target, typically you end
+  up with something like an "image.bin" file in the images directory.
+  
+  How to load and run the generated image will depend on your target
+  system hardware. Consult the manufactures documentation on methods
+  to use to load and run software.
+  
+2) Changing the Applications/Kernel/Libraries
+---------------------------------------------
+
+The best way to change the configured applications for you target
+Vendor/Board is to make use of the config system.  You can configure
+by running one of the following three commands:
+
+    make xconfig             - graphical X11 based config
+    make menuconfig          - graphical colour/text based config
+    make config              - most portable but tedious shell script
+                               based config
+
+If you are running X Window's then use of the 'make xconfig' is
+recommended.  Throughout this document 'make xconfig'  will be used where
+ever one of the above may be substituted.
+
+The options on the first config screen are:
+
+	Default all settings (lose changes)
+      Set the defaults for building to the settings that are stored in the
+      vendors/Vendor/Board directory.  If you have previously changed/customised
+      the build your changes will be lost.  This setting always is always set
+      to 'N' when you run the config.
+
+	Customize Kernel Settings
+      Do you want to fine tune the kernel config.  You should be aware that an
+      incorrect kernel config may stop your board from booting.
+
+	Customize Vendor/User Settings
+      Do you want to fine tune the user programs and library settings that are
+      built/installed into your image.
+	  
+	Update Default Vendor Settings
+      Do you want the configuration you have just selected to replace
+      the default configuration for this vendor.  You should only select this
+      if you have confirmed that your config good and that you board is
+      functioning as expected after the changes you have made.
+
+If you have setup your own modules directory to contain modules that
+are built outside of the kernel source,  an options to configure these will
+also appear on this screen.
+
+When you 'Save and Exit' the build system will run your through the configs
+you have selected to customise.
+
+3) Building for debugging
+-------------------------
+
+A common thing you will need to do is build your source for symbolic/source
+level debugging.  This is easy to do,  but not that easy to find :-)
+
+	* Run 'make xconfig'
+	* Tick 'Customize Kernel Settings'
+	* Tick 'Customize Vendor/User Settings'
+	* Save and Exit
+
+In the "kernel config",  go to the "Kernel Hacking" section and enable
+"Full symbolic/source level debugging".
+
+
+4) Layout of the source
+-----------------------
+
+See the ./SOURCE document included in this distribution.
+
+5) Adding a platform
+--------------------
+
+See the file ./Documentation/Adding-Paltforms-HOWTO
+
+6) Adding an application
+------------------------
+
+See the file ./Documentation/Adding-User-Apps-HOWTO
+
+7) FAQ
+------
+
+Nothing here yet.
+

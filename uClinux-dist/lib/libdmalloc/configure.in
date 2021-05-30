@@ -1,0 +1,631 @@
+dnl
+dnl Process this file with autoconf to produce a configure script.
+dnl
+dnl NOTE: the beginning comments should be dnl'ed so we get the #!/bin/sh
+dnl at the very top of the configure script.
+dnl
+dnl Copyright 2000 by Gray Watson
+dnl
+dnl This file is part of the dmalloc package.
+dnl
+dnl Permission to use, copy, modify, and distribute this software for
+dnl any purpose and without fee is hereby granted, provided that the
+dnl above copyright notice and this permission notice appear in all
+dnl copies, and that the name of Gray Watson not be used in
+dnl advertising or publicity pertaining to distribution of the
+dnl document or software without specific, written prior permission.
+dnl
+dnl Gray Watson makes no representations about the suitability of the
+dnl software described herein for any purpose.  It is provided "as is"
+dnl without express or implied warranty.
+dnl
+dnl The author may be contacted via http://dmalloc.com/
+dnl
+dnl $Id: configure.in,v 1.1 2000/11/01 01:19:03 pauli Exp $
+dnl
+AC_REVISION($Revision: 1.1 $)dnl
+AC_INIT(dmalloc.c)
+AC_CONFIG_HEADER(conf.h)
+
+AC_CHECKING(configurations for the dmalloc library)
+
+##############################################################################
+# arguments
+
+AC_ARG_ENABLE(cxx,
+    [  --disable-cxx      do not build in C++ support (enabled by default)],,
+    enable_cxx=yes)
+AC_ARG_ENABLE(threads,
+    [  --enable-threads   build in thread support (disabled by default)],,
+    enable_threads=no)
+
+##############################################################################
+AC_CHECKING(build utilities)
+
+AC_PROG_CC
+AC_PROG_CXX
+
+# cxx support
+CXX_ON=#
+CXX_OFF=
+AC_MSG_CHECKING(C++ support)
+if test "$ac_cv_prog_cxx_works" = "yes"; then
+    if test "$enable_cxx" = "yes"; then
+	CXX_ON=
+	CXX_OFF=#
+    fi
+fi
+if test "$CXX_ON" = ""; then
+    AC_MSG_RESULT(enabled)
+else
+    AC_MSG_RESULT(disabled)
+fi
+AC_SUBST(CXX_ON)
+AC_SUBST(CXX_OFF)
+
+# thread support
+TH_ON=#
+TH_OFF=
+AC_MSG_CHECKING(thread support)
+if test "$enable_threads" = "yes"; then
+    TH_ON=
+    TH_OFF=#
+fi
+if test "$TH_ON" = ""; then
+    AC_MSG_RESULT(enabled)
+else
+    AC_MSG_RESULT(disabled)
+fi
+AC_SUBST(TH_ON)
+AC_SUBST(TH_OFF)
+
+# why is this necessary, grrr
+cross_compiling=no
+#Hopefully: ac_cc_ansi_flag macro
+AC_CACHE_CHECK("ANSI compiler flags", ac_cv_ansi_cc_flags,
+	ac_cv_ansi_cc_flags=""
+	AC_TRY_RUN([
+#if defined(__STDC__) && __STDC__ == 1
+main()
+{
+#endif	
+	exit(0);
+}
+	],[ ac_cv_ansi_cc_flags="none needed" ], [
+	XX_OLD_CFLAGS="$CFLAGS"
+	#
+	# Ultrix/OSF-1		-std1
+	# USL SV4		-Xc
+	# HPUX			-Aa
+	# AIX			-qlanglvl=ansi
+	#
+	for a in "-qlanglvl=ansi" "-std1" "-Xc" "-Aa"
+	do
+		CFLAGS="$XX_OLD_CFLAGS"
+		CFLAGS="$CFLAGS $a"
+		# NOTE: we must get a good compile from STDC else we
+		# can't tell if it failed from program or use of option
+		AC_TRY_RUN([
+#if defined(__STDC__) && __STDC__ == 1
+main()
+{
+#endif	
+	exit(0);
+}
+		],[
+			ac_cv_ansi_cc_flags="$a"
+			break
+		])
+	done
+	CFLAGS="$XX_OLD_CFLAGS"
+	])
+)
+if test "$ac_cv_ansi_cc_flags" = "unknown" ; then
+	AC_MSG_WARN()
+	AC_MSG_WARN(WARNING: no ansi compiler.  you may have to run 'make noansi')
+	AC_MSG_WARN()
+else
+	if test "$ac_cv_ansi_cc_flags" != "none needed" ; then
+		CC="$CC $ac_cv_ansi_cc_flags"
+	fi
+fi
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AC_CONST
+if test "$ac_cv_c_const" != "yes"; then
+	AC_DEFINE(const,)
+fi
+
+# we need this for various settings
+AC_HEADER_STDC
+AC_CHECK_HEADERS(stdarg.h)
+if test "$ac_cv_header_stdarg_h" = "yes"; then
+	HAVE_STDARG_H=1
+else
+	HAVE_STDARG_H=0
+fi
+AC_SUBST(HAVE_STDARG_H)
+AC_CHECK_HEADERS(stdlib.h)
+if test "$ac_cv_header_stdlib_h" = "yes"; then
+	HAVE_STDLIB_H=1
+else
+	HAVE_STDLIB_H=0
+fi
+AC_SUBST(HAVE_STDLIB_H)
+AC_CHECK_HEADERS(string.h)
+if test "$ac_cv_header_string_h" = "yes"; then
+	HAVE_STRING_H=1
+else
+	HAVE_STRING_H=0
+fi
+AC_SUBST(HAVE_STRING_H)
+AC_CHECK_HEADERS(unistd.h)
+if test "$ac_cv_header_unistd_h" = "yes"; then
+	HAVE_UNISTD_H=1
+else
+	HAVE_UNISTD_H=0
+fi
+AC_SUBST(HAVE_UNISTD_H)
+AC_CHECK_HEADERS(sys/types.h)
+if test "$ac_cv_header_sys_types_h" = "yes"; then
+	HAVE_SYS_TYPES_H=1
+else
+	HAVE_SYS_TYPES_H=0
+fi
+AC_SUBST(HAVE_SYS_TYPES_H)
+AC_CHECK_HEADERS(sys/mman.h)
+if test "$ac_cv_header_sys_mman_h" = "yes"; then
+	HAVE_SYS_MMAN_H=1
+else
+	HAVE_SYS_MMAN_H=0
+fi
+AC_SUBST(HAVE_SYS_MMAN_H)
+
+#
+# check for size_t and unsigned-ness
+#
+AC_TYPE_SIZE_T
+if test "$ac_cv_type_size_t" = "yes"; then
+  AC_DEFINE(DMALLOC_SIZE,size_t)
+else
+  AC_DEFINE(DMALLOC_SIZE,unsigned long)
+fi
+AC_CACHE_CHECK("dmalloc size unsigned", ac_cv_dmalloc_size_unsigned,
+  AC_TRY_RUN([
+#include <sys/types.h>
+#if HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+main() { DMALLOC_SIZE x = -1; if (x >= 0) exit(0); else exit(1); }
+   ], ac_cv_dmalloc_size_unsigned=yes, ac_cv_dmalloc_size_unsigned=no )
+)
+if test "$ac_cv_dmalloc_size_unsigned" = "yes"; then
+	AC_DEFINE(DMALLOC_SIZE_UNSIGNED,1)
+else
+	AC_DEFINE(DMALLOC_SIZE_UNSIGNED,0)
+fi
+
+#
+# check for strdup macro (linux)
+#
+AC_CACHE_CHECK("strdup macro", ac_cv_strdup_macro,
+  AC_TRY_RUN([
+#if HAVE_STDLIB_H
+#include <string.h>
+#endif
+
+#ifdef strdup
+main() { exit(0); }
+#else
+main() { exit(1); }
+#endif
+   ], ac_cv_strdup_macro=yes, ac_cv_strdup_macro=no )
+)
+
+#
+# check for existance of mprotect and associated defines
+#
+AC_CHECK_FUNCS(mprotect)
+AC_CACHE_CHECK("memory protection", ac_cv_protect_allow,
+  if test $ac_cv_func_mprotect = no; then
+    ac_cv_protect_allow=no
+  else
+    AC_TRY_LINK([
+#include <sys/types.h>
+#include <sys/mman.h>
+], [
+	  int prot = PROT_NONE | PROT_READ | PROT_WRITE;
+	  (void)mprotect(0, 0, prot);
+	], ac_cv_protect_allow=yes, ac_cv_protect_allow=no
+	)
+  fi
+)
+if test "$ac_cv_protect_allow" = "yes"; then
+	AC_DEFINE(PROTECT_ALLOWED,1)
+else
+	AC_DEFINE(PROTECT_ALLOWED,0)
+fi
+
+##############################################################################
+AC_CHECKING(important functionality)
+AC_CHECK_FUNCS(sbrk)
+if test $ac_cv_func_sbrk = no; then
+	AC_MSG_ERROR(The library requires the sbrk function.)
+fi
+
+#
+# heap growing up
+#
+AC_CACHE_CHECK("heap growing up", ac_cv_heap_grows_up,
+	AC_TRY_RUN([
+#define SBRK_AMOUNT	(32 * 1024)
+
+main()
+{
+  char * first, *next;
+  first = (char *)sbrk(SBRK_AMOUNT);
+  next = (char *)sbrk(SBRK_AMOUNT);
+  if (next > first)
+    exit(0);
+  else
+    exit(1);
+}
+		], ac_cv_heap_grows_up=yes, ac_cv_heap_grows_up=no
+	)
+)
+if test $ac_cv_heap_grows_up = yes; then
+	AC_DEFINE(HEAP_GROWS_UP, 1)
+else
+	AC_DEFINE(HEAP_GROWS_UP, 0)
+	AC_MSG_WARN()
+	AC_MSG_WARN(WARNING: The library has limited support for heaps)
+	AC_MSG_WARN(that grow down.  Please see the NOTES file and)
+	AC_MSG_WARN(send the author mail.)
+	AC_MSG_WARN()
+fi
+
+#
+# check for basic block size
+#
+AC_CHECK_FUNCS(getpagesize)
+AC_CACHE_CHECK("basic-block size in bits", ac_cv_page_size,
+  if test $ac_cv_func_getpagesize = no; then
+    ac_cv_page_size=15
+  else
+   AC_TRY_RUN([
+main() { if (getpagesize() <= 2048) exit(0); else exit(1); }
+   ], ac_cv_page_size=11, [
+      AC_TRY_RUN([
+main() { if (getpagesize() == 4096) exit(0); else exit(1); }
+      ], ac_cv_page_size=12, [
+         AC_TRY_RUN([
+main() { if (getpagesize() == 8192) exit(0); else exit(1); }
+         ], ac_cv_page_size=13, [
+            AC_TRY_RUN([
+main() { if (getpagesize() == 16384) exit(0); else exit(1); }
+            ], ac_cv_page_size=14, ac_cv_page_size=15
+            )
+         ])
+      ])
+   ])
+  fi
+)
+AC_DEFINE_UNQUOTED(BASIC_BLOCK,$ac_cv_page_size)
+
+#
+# data-alignment size...
+#
+AC_CHECK_SIZEOF(long)
+AC_MSG_CHECKING(data-alignment size)
+if test $ac_cv_sizeof_long = 4; then
+	# we have to make a special case for sun sparc idiocy
+	AC_MSG_RESULT([8 (special_case)])
+	AC_DEFINE(ALLOCATION_ALIGNMENT,8)
+else
+	AC_MSG_RESULT($ac_cv_sizeof_long)
+	AC_DEFINE_UNQUOTED(ALLOCATION_ALIGNMENT,$ac_cv_sizeof_long)
+fi
+
+#
+# check the safety of the abort function
+#
+AC_CHECK_FUNCS(abort)
+AC_CACHE_CHECK("abort safety", ac_cv_abort_safe,
+	if test $ac_cv_func_abort = no; then
+		ac_cv_abort_safe=0
+	else
+		AC_TRY_RUN([
+changequote(<<, >>)dnl
+<<
+static int main_b = 0;
+static char heap_mem[102400], *heap_p = heap_mem;
+free () { if (main_b) _exit(0); }
+char *malloc (int size) {
+  char *pnt;
+  if (main_b) _exit(0);
+  pnt = heap_p;
+  heap_p += size;
+  return pnt;
+}
+char *calloc (int number, int size) {
+  char *start, *pnt, *end;
+  if (main_b) _exit(0);
+  /* it should be already 0s */
+  start = malloc (number * size);
+  pnt = start;
+  end = start + size;
+  while (pnt < end) { *pnt++ = '\0'; }
+  return start;
+}
+char *realloc (char *old_pnt, int new_size) {
+  char *start, *pnt, *end;
+  if (main_b) _exit(0);
+  start = malloc (new_size);
+  pnt = start;
+  end = start + new_size;
+  while (pnt < end) { *pnt++ = *old_pnt++; }
+  return start;
+}
+main() { main_b = 1; abort(); _exit(1); }
+>>
+changequote([, ])dnl
+		], ac_cv_abort_safe=no, ac_cv_abort_safe=yes
+		)
+	fi
+)
+if test $ac_cv_abort_safe = yes; then
+	AC_DEFINE(ABORT_OKAY, 1)
+else
+	AC_DEFINE(ABORT_OKAY, 0)
+fi
+
+AC_TYPE_SIGNAL
+AC_CACHE_CHECK("signal usage", ac_cv_use_signal,
+	AC_TRY_RUN([
+
+/* test the include file */
+#include <signal.h>
+
+RETSIGTYPE
+handler (const int sig)
+{
+}
+
+main()
+{
+  /* test the following signals */
+  (void)signal(SIGHUP, handler);
+  (void)signal(SIGINT, handler);
+  (void)signal(SIGTERM, handler);
+  _exit(0);
+}
+	], ac_cv_use_signal=yes, ac_cv_use_signal=no
+	),
+)
+if test $ac_cv_use_signal = yes; then
+	AC_DEFINE(SIGNAL_OKAY, 1)
+else
+	AC_DEFINE(SIGNAL_OKAY, 0)
+fi
+
+#
+# check if the return.h macros work
+#
+AC_CACHE_CHECK("return.h macros work", ac_cv_return_macros_work,
+  AC_TRY_RUN([
+
+#define __CONF_H__
+#define USE_RETURN_MACROS 1
+#define RETURN_MACROS_WORK 1
+
+#include "return.h"
+
+static void foo (void)
+{
+  char	*ret_addr;
+  GET_RET_ADDR(ret_addr);
+}
+
+main()
+{
+  foo();
+  exit(0);
+}
+   ], ac_cv_return_macros_work=yes, ac_cv_return_macros_work=no )
+)
+if test $ac_cv_return_macros_work = yes; then
+	AC_DEFINE(RETURN_MACROS_WORK, 1)
+else
+	AC_DEFINE(RETURN_MACROS_WORK, 0)
+fi
+
+##############################################################################
+AC_CHECKING(pthread particulars)
+
+# save the current libs variable
+XX_OLD_LIBS="$LIBS"
+
+AC_CHECK_LIB(pthread, pthread_mutex_init)
+if test $ac_cv_lib_pthread_pthread_mutex_init = no; then
+	AC_CHECK_LIB(pthreads, pthread_mutex_init)
+fi
+AC_CHECK_HEADERS(pthread.h)
+if test "$ac_cv_header_pthread_h" = "yes"; then
+	AC_DEFINE_UNQUOTED(THREAD_INCLUDE,<pthread.h>)
+else
+	AC_CHECK_HEADERS(pthreads.h)
+	if test "$ac_cv_header_pthreads_h" = "yes"; then
+		AC_DEFINE_UNQUOTED(THREAD_INCLUDE,<pthreads.h>)
+	fi
+fi
+
+AC_CHECK_FUNCS(pthread_mutex_init pthread_mutex_lock pthread_mutex_unlock)
+
+AC_CACHE_CHECK("pthread mutex type", ac_cv_pthread_mutex,
+	AC_TRY_LINK([
+#ifdef THREAD_INCLUDE
+#include THREAD_INCLUDE
+#endif
+], [
+	pthread_mutex_t dmalloc_mutex;
+	        ],
+		ac_cv_pthread_mutex=pthread_mutex_t,
+		ac_cv_pthread_mutex=unknown),
+)
+if test "$ac_cv_pthread_mutex" != "unknown"; then
+	AC_DEFINE_UNQUOTED(THREAD_MUTEX_T,$ac_cv_pthread_mutex)
+fi
+
+AC_CACHE_CHECK("pthread attribute initialization", ac_cv_pthread_init,
+	AC_TRY_LINK([
+#ifdef THREAD_INCLUDE
+#include THREAD_INCLUDE
+#endif
+], [
+	THREAD_MUTEX_T dmalloc_mutex;
+	pthread_mutex_init(&dmalloc_mutex, pthread_mutexattr_default);
+		],
+		ac_cv_pthread_init=pthread_mutexattr_default,
+		ac_cv_pthread_init=0L
+		),
+)
+AC_DEFINE_UNQUOTED(THREAD_LOCK_INIT_VAL,$ac_cv_pthread_init)
+
+# restore the libs - we don't want to have -lpthread set in the
+# dmalloc Makefile.
+LIBS=$XX_OLD_LIBS
+
+##############################################################################
+AC_CHECKING(functions)
+
+# auto-shutdown functions
+AC_CHECK_FUNCS(atexit on_exit)
+if test $ac_cv_func_atexit = no && test $ac_cv_func_on_exit = no; then
+	AC_MSG_WARN()
+	AC_MSG_WARN(WARNING: The library cannot automatically shut itself)
+	AC_MSG_WARN(down without atexit or on_exit.  You will need to call)
+	AC_MSG_WARN(dmalloc_shutdown directly before exit to get the final)
+	AC_MSG_WARN(statistics and unfreed memory information.)
+	AC_MSG_WARN()
+fi
+
+# other bells and whistles
+AC_CHECK_FUNCS(fork getpid time ctime random)
+AC_CHECK_FUNCS(vprintf snprintf vsnprintf)
+AC_CHECK_FUNCS(recalloc memalign valloc)
+
+# required
+AC_CHECK_FUNCS(memcmp memcpy memset)
+AC_CHECK_FUNCS(strchr strrchr)
+AC_CHECK_FUNCS(strcat strlen strcmp strcpy strsep)
+
+##############################################################################
+AC_CHECKING(various functions for argv files)
+
+# NOTE: rest handled above
+AC_CHECK_FUNCS(strncmp strncpy)
+
+##############################################################################
+AC_CHECKING(various functions for argument checking)
+
+AC_CHECK_FUNCS(bcmp bcopy bzero)
+AC_CHECK_FUNCS(memccpy memchr)
+# we have the escape index because it is a m4/autoconf command
+AC_CHECK_FUNCS([[index]] rindex strcasecmp strncasecmp)
+AC_CHECK_FUNCS(strdup strspn strcspn strncat strpbrk strstr strtok)
+
+AC_OUTPUT(Makefile, [
+
+newfile=dmalloc.h.2
+echo creating $newfile
+rm -f $newfile.t
+echo '/* this is dmalloc.h.2 */' > $newfile.t
+echo '/* produced by configure, inserted into dmalloc.h */' >> $newfile.t
+echo '' >> $newfile.t
+
+if test "$ac_cv_c_const" = "yes"; then
+	echo '/* const is available */' >> $newfile.t
+else
+        echo '/* const is not available */' >> $newfile.t
+	echo '#ifndef const' >> $newfile.t
+	echo '#define const' >> $newfile.t
+	echo '#endif' >> $newfile.t
+fi
+
+if test "$ac_cv_strdup_macro" = "yes"; then
+	echo '/* strdup is a macro */' >> $newfile.t
+	echo '#define DMALLOC_STRDUP_MACRO' >> $newfile.t
+else
+	echo '/* strdup is not a macro */' >> $newfile.t
+	echo '#undef DMALLOC_STRDUP_MACRO' >> $newfile.t
+fi
+echo '' >> $newfile.t
+
+echo '/*' >> $newfile.t
+echo ' * the definition of DMALLOC_SIZE' >> $newfile.t
+echo ' *' >> $newfile.t
+echo ' * NOTE: some architectures have malloc, realloc, etc.' >> $newfile.t
+echo ' * using unsigned instead of unsigned long.  You may' >> $newfile.t
+echo ' * have to edit this by hand to fix any compilation' >> $newfile.t
+echo ' * warnings or errors.' >> $newfile.t
+echo ' */' >> $newfile.t
+if test "$ac_cv_type_size_t" = "yes"; then
+	echo "#include <sys/types.h>" >> $newfile.t
+	echo "#define DMALLOC_SIZE size_t" >> $newfile.t
+else
+	echo "/* no include file needed */" >> $newfile.t
+	echo "#define DMALLOC_SIZE unsigned long" >> $newfile.t
+fi
+echo '' >> $newfile.t
+echo '/*' >> $newfile.t
+echo ' * We use stdarg.h for the dmalloc_message and' >> $newfile.t
+echo ' * dmalloc_vmessage functions.' >> $newfile.t
+echo ' */' >> $newfile.t
+if test "$ac_cv_header_stdarg_h" = "yes"; then
+	echo "#include <stdarg.h>" >> $newfile.t
+	echo "#define DMALLOC_STDARG 1" >> $newfile.t
+else
+	echo "/* no stdarg.h available */" >> $newfile.t
+	echo "#define DMALLOC_STDARG 0" >> $newfile.t
+fi
+echo '' >> $newfile.t
+if cmp -s $newfile $newfile.t 2>/dev/null; then
+  echo "$newfile is unchanged"
+  rm -f $newfile.t
+else
+  rm -f $newfile
+  mv $newfile.t $newfile
+fi
+
+newfile=settings.h
+echo creating $newfile from settings.dist
+rm -f $newfile.t
+echo '/*' > $newfile.t
+echo ' * WARNING: this file was produced from settings.dist' >> $newfile.t
+echo ' * by the configure program.  The configure script, when' >> $newfile.t
+echo ' * run again, will overwrite changed made here.' >> $newfile.t
+echo ' */' >> $newfile.t
+echo '' >> $newfile.t
+cat $srcdir/settings.dist >> $newfile.t
+
+if cmp -s $newfile.t $newfile 2>/dev/null; then
+  echo "$newfile is unchanged"
+  rm -f $newfile.t
+else
+  rm -f $newfile
+  mv $newfile.t $newfile
+fi
+], [
+ac_cv_c_const="$ac_cv_c_const"
+ac_cv_strdup_macro="$ac_cv_strdup_macro"
+ac_cv_type_size_t="$ac_cv_type_size_t"
+ac_cv_header_stdarg_h="$ac_cv_header_stdarg_h"
+])
+
+AC_MSG_WARN()
+AC_MSG_WARN(Please check-out Makefile and conf.h to make sure that)
+AC_MSG_WARN(sane configuration values were a result.)
+AC_MSG_WARN()
+AC_MSG_WARN(You may want to change values in settings.h before)
+AC_MSG_WARN(running 'make'.  Pthreads users especially.)
+AC_MSG_WARN()

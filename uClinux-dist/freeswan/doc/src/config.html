@@ -1,0 +1,2807 @@
+<html>
+<head>
+<title>FreeS/WAN configuration</title>
+<meta name="keywords" content="Linux, IPSEC, VPN, security, FreeSWAN, configuration">
+
+<!--
+
+Written by Sandy Harris for the Linux FreeS/WAN project
+Freely distributable under the GNU General Public License
+
+More information at www.freeswan.org
+Feedback to users@lists.freeswan.org
+
+-->
+</head>
+
+<body>
+
+<h1><a name="setup">Configuration</a></h1>
+
+<p>This section describes setting up and testing Linux FreeS/WAN.</p>
+
+<p>Before attempting this, you should:</p>
+<ul>
+  <li>look at our <a href="intro.html">introduction</a> section. We assume here
+    that you understand concepts and terms described there.</li>
+  <li>ensure that FreeS/WAN is installed on your system. See these links:
+    <ul>
+      <li><a href="install.html#testinstall">testing</a> whether FreeS/WAN is
+      installed</li>
+      <li>performing an <a href="install.html">installation</a></li>
+    </ul>
+  </li>
+</ul>
+
+<p>
+You also need to set up and test IP networking on all the machines you plan
+to install FreeS/WAN on or to use in testing, before trying to set up
+FreeS/WAN. This is discussed in more detail after the description of our
+example networks.</p>
+
+<h2><a name="example">Our example networks</a></h2>
+
+<p>
+For our examples, we assume that there are only three networks involved,
+two that want to talk to each other plus the Internet in the middle. The idea
+is to build an encrypted tunnel across the Internet so the two networks can
+talk securely. Once you have this working between two network gateways,
+extending it to three or more is straightforward.</p>
+
+<p>
+In our examples, we'll call the two gateways East and West. We'll have only
+one client machine on each net: Sunrise in the East and Sunset in the
+West.</p>
+
+<p>A diagram:</p>
+<pre>
+     Sunset==========West------------------East=========Sunrise
+           local net       untrusted net       local net
+</pre>
+
+<p>
+Our goal here is to tell you how to set up the two gateways, East and West.
+We assume your goal is to ensure that East and West encrypt all traffic
+between them, or at least all that your security policies require them to
+encrypt.</p>
+
+<p>
+Of course one does not always have a security gateway separate from the
+client machine. Especially for road warriors, a network that looks like this
+is common:</p>
+<pre>
+                                           telecommuter's PC or
+       corporate LAN                       traveller's laptop
+     Sunset==========West------------------East
+           local net       untrusted net
+</pre>
+<p>and this is possible:</p>
+<pre>
+                     West------------------East
+                           untrusted net
+</pre>
+
+<p>
+In our configuration files, and in this discussion, we treat the two
+simpler setups as degenerate cases of the network-to-network link. For all the
+diagrams above, for example, we speak of &quot;the subnet behind East&quot;. In two of the
+diagrams, of course, that &quot;subnet&quot; is just the machine itself.</p>
+
+<p>
+This may take some getting used to, but we hope it is less confusing than
+continually having to say things like &quot;the subnet behind East (or the East
+machine itself if there is no client subnet)&quot;.</p>
+
+<h2><a name="testnet">Configuration for a testbed network</a></h2>
+
+<p>Many users just want to get IPSEC installed on a few machines. They can
+skip this section.</p>
+
+<p>Others may want to build a testbed network, for any of a number of reasons.
+For them, we have some suggestions.</p>
+
+<p>
+The ideal test setup for IPSEC is something like:</p>
+<pre>
+        Sunset==========West-----eth0    eth1-----East=========Sunrise
+              local net          test machine         local net
+</pre>
+<p>
+The test machine routes packets between the two gateways. This makes things
+more complicated than if you just connected the two gateway machines directly
+to each other, but it also makes your test setup much more like the
+environment you actually use IPSEC in. Those environments nearly always
+involve routing, and quite a few apparent IPSEC failures turn out to be
+problems with routing or with firewalls dropping packets. This approach lets
+you deal with those problems on your test setup.</p>
+<p>
+Also, the test machine is in the ideal position to run diagnostic software
+(such as tcpdump(8)) for checking IPSEC packets. Such software is likely to
+misbehave if run on the gateways themselves. It is designed to look into a
+normal IP stack and may become confused if you ask it to display data from a
+stack which has IPSEC in play.</p>
+<p>
+For more detailed testbed information see these <a href="mail.html">mailing list</a>
+messages:
+<ul>
+<li>a user's detailed
+<a href="http://www.sandelman.ottawa.on.ca/linux-ipsec/html/2000/11/msg00571.html">setup diary</a>
+for his testbed network
+<li>a FreeS/WAN team member's
+<a href="http://www.sandelman.ottawa.on.ca/linux-ipsec/html/2000/11/msg00425.html">notes</a>
+from testing at an IPSEC interop &quot;bakeoff&quot;
+</ul>
+<h2><a name="setupnet">Set up and test networking</a></h2>
+
+<p>
+Before trying to get FreeS/WAN working, you should configure and test IP
+networking on both gateways and on at least one client machine behind each of
+them. <strong>IPSEC cannot work without a working IP network beneath
+it.</strong> Many reported "FreeS/WAN problems" turn out to actually be
+problems with routing or firewalling. If any actual IPSEC problems turn up,
+you often cannot even recognise them (much less debug them) unless the
+underlying network is right.</p>
+
+<p>If you need advice on this, your best sources are likely:</p>
+<ul>
+  <li>the <a href="http://www.linuxdoc.org/HOWTO/Net-HOWTO/index.html">Networking Howto</a></li>
+  <li>the <a href="http://www.linuxdoc.org/LDP/nag2/index.html">Network
+    Administrator's Guide</a>.</li>
+  <li>the <a
+    href="http://netfilter.kernelnotes.org/unreliable-guides/networking-concepts-HOWTO/index.html">Linux
+    Networking-concepts HOWTO</a> from Rusty Russell, author of most of the
+    Linux firewalling code</li>
+</ul>
+<p>
+See also our <a href="biblio.html">bibliography</a>.
+
+<p>Here is our network diagram again:</p>
+<pre>
+        Sunset==========West------------------East=========Sunrise
+              local net       untrusted net       local net
+</pre>
+
+<p>
+The client machines, Sunrise and Sunset in our example, may have assigned
+<a href="glossary.html#routable">routable</a> IP addresses, or they may be using private <a
+href="glossary.html#non-routable">non-routable</a> addresses (as defined in RFC 1918) with
+the gateways doing <a href="glossary.html#masq">IP masquerade</a>. It doesn't matter which,
+as long as whatever it is works correctly.</p>
+
+<p>Note, however, that the two subnets must have distinct addresses. You
+cannot have them both masqueraded to the same range of RFC 1918 addresses.</p>
+<ul>
+  <li>If Sunrise and Sunset have routable IP addresses, test that they can
+    ping each other.</li>
+  <li>If IP masquerading is in use, test as far as you can. For example, if
+    Sunset is masqueraded behind West then Sunrise cannot ping Sunset but
+    should be able to ping West. Whether Sunset can ping Sunrise, assuming
+    Sunrise is not masqueraded, would depend on whether West's rules let ICMP
+    packets through. If not, you should adjust those rules.</li>
+</ul>
+
+<p>In any case, it is not enough to just test that East and West can
+communicate.</p>
+
+<h3><a name="forward">Enabling packet forwarding</a></h3>
+<p>
+Some systems turn off packet forwarding by default, even for kernels in which it
+has been enabled. This is the safe default. You don't want systems forwarding
+packets in uncontrolled ways.
+<p>
+To turn forwarding on temporarily, use the following command as root:
+<pre>
+         echo "1" &gt; /proc/sys/net/ipv4/ip_forward
+</pre>
+Turning it on permanently is also possible. The exact method varies from
+distribution to distribution:
+<dl>
+<dt>Older Readhat
+  <dd>in the file <var>/etc/sysconfig/network</var>, set
+    <var>
+         FORWARD_IPV4=yes
+   </var>
+<dt>Redhat 6.x and 7.0
+  <dd>in the file <var>/etc/sysconfig/network</var>, set
+    <var>
+        net.ipv4.ip_forward=1
+    </var> 
+<dt>Debian r2.2 systems (and most likely Debian r2.2 derived systems):
+  <dd>in the file <var>/etc/network/options</var>, set
+<var>
+    ip_forward=yes
+</var>
+</dl>
+<p>
+A gateway machine needs forwarding enabled or it will not route packets
+between the two networks it is attached to. The simplest way to ensure
+this is to enable forwarding using whatever method your distribution
+provides. See list above.
+<p>
+A more conservative approach is to disable forwarding in your system
+configuration, then enable from your boot scripts after appropriate
+firewall scripts are in place. 
+
+<h3><a name="othersoft">Other software</h3>
+<p>
+Configure and test any other software you will want to use for testing once
+IPSEC is up. For example, you might put an HTTP daemon on Sunset and a browser
+on Sunrise. Make sure these work without IPSEC.</p>
+
+<p>If these tests fail, figure out why and fix it. <strong>Do not proceed
+until it works.</strong></p>
+
+<h2><a name="rtfm">RTFM (please Read The Fine Manuals)</a></h2>
+
+<p>
+As with most things on any Unix-like system, most parts of Linux
+FreeS/WAN are documented in online manual pages. We provide a list of
+<a href="manpages.html">FreeS/WAN man pages</a>, with links to HTML versions of
+them.
+<p>
+The man pages describing configuration files are:
+<ul>
+    <li><a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a></li>
+    <li><a href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a></li>
+</ul>
+<p>
+Man pages for commands used in this document include:</p>
+<ul>
+  <li><a href="manpage.d/ipsec.8.html">ipsec(8)</a></li>
+  <li><a href="manpage.d/ipsec_pluto.8.html">ipsec_pluto(8)</a></li>
+  <li><a href="manpage.d/ipsec_rsasigkey.8.html">ipsec_rsasigkey(8)</a></li>
+  <li><a href="manpage.d/ipsec_auto.8.html">ipsec_auto(8)</a></li>
+  <li><a href="manpage.d/ipsec_manual.8.html">ipsec_manual(8)</a></li>
+</ul>
+
+<p>
+You can read these either in HTML using the links above or with the
+<var>man(1)</var> command.<p>
+
+
+<h2><a name="usersakey">Setting up RSA authentication keys</a></h2>
+
+<p>
+RSA keys come in matched pairs. Each pair includes:</p>
+<ul>
+   <li>a <strong>public key</strong> which need not be kept secure. Everyone
+     you plan to communicate with must be able to get a copy of this. It does
+     not matter if an enemy gets it as well.</li>
+   <li>a <strong>private key</strong> which must be kept secure. No-one but
+     you should have access to it.
+</ul>
+<p>
+For FreeS/WAN, both keys for your system are in the
+<a href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a> file.
+<strong>Maintaining security of this file is essential</strong> since
+it holds your private key.</p>
+<p>
+Public keys for systems you communicate with are placed in
+<a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a>. Security
+here is less vital (unless you are using manual keying as well, in
+which case the file may have secret keys). It does not matter if
+an enemy knows the public keys, as long as the private keys are
+protected.</p> 
+
+<h3><a name="genrsakey">Generating an RSA key pair</a></h3>
+
+<p>
+If you installed FreeS/WAN yourself, then the installation process has
+already generated an RSA key pair for you and placed it in the
+<a href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a> file.</p>
+
+<p>If not, you need to:</p>
+<ul>
+    <li>Generate an RSA key pair (private and public) using
+      <a href="manpage.d/ipsec_rsasigkey.8.html">ipsec_rsasigkey(8)</a>.</li>
+    <li>Put the private key in <a href="manpage.d/ipsec.secrets.5.html">ipsec.secrets</a>,
+      with a wrapper. The result looks like this:
+      <pre>
+: RSA {
+      &lt;stuff generated by rsasigkey&gt;
+
+      }
+</pre>
+Note that:
+      <ul>
+        <li>the ":" must be unindented (at the margin)</li>
+        <li>the other lines, including the "}", must be indented (not at the
+          margin)</li>
+        <li>spaces are needed to separate tokens so, for example, ":RSA{"
+          won't work.</li>
+      </ul>
+</ul>
+<p>
+      This means "always use this as my private RSA key". For other options,
+      for example if you want to use different keys with different partners,
+      see the man pages.</li>
+<p>
+The RSA keys we generate are suitable <strong>only</strong> for authentication,
+not for encryption. IPSEC uses them only for authentication. See our
+<a href="ipsec.html">IPSEC</a> section for details.</p>
+<p>
+It is also possible to use keys in other formats, not generated by FreeS/WAN.
+This may be necessary for interoperation with other IPSEC implementations.
+See our links to <a href="web.html#patches">patches</a> which add support for keys
+generated by PGP or embedded in X.509 certificates.</p>
+
+<h3><a name="keyexchange">Exchanging authentication keys</a></h3>
+
+<p>
+The next step is to send your public key to everyone you need to set up
+connections with, and collect their public keys.  The public key is
+the line in the output of rsasigkey starting &quot;#pubkey=0x&quot;.</p>
+<p>
+Public keys need not be protected as fanatically as private keys. They
+are intended to be made public; the system is designed to work even if
+an enemy knows all the public keys used.</p>
+<p>
+Note, however, that <strong>authentication of public keys is critical</strong>.
+It does not matter if an enemy knows your public keys, but if you can be
+tricked into trusting a public key supplied by an enemy, you are in deep
+trouble.</p>
+<p>
+For example, consider the fellow who wants to communicate with his mistress,
+keeping messages secret from his wife.
+<ul>
+<li>If the wife obtains the mistress' public key, that is not a problem.
+As long as she does not get the private key, she can neither read things
+sent to the mistress nor authenticate herself as the mistress.</li>
+<li>If the mistress has any sense, she protects her private key carefully.
+So long as she does that, and the husband encrypts his messages correctly,
+there should be no (cryptographic!) problem.</li>
+<li>However, imagine that the wife is somewhat devious. She generates a
+public/private key pair and sends the husband that public key, forging
+the message to look as if it came from the mistress. Of course this fails
+if the husband has enough sense to check the key's validity before using
+it.</li>
+<li>However, if the husband blindly <em>accepts that key without verification</em>,
+it is <em>extremely</em> unlikely that he will be pleased with the results.</li>
+<li>If he accepts that key, the wife can read every message he sends to it.
+<li>She can also pose as the mistress and send him whatever messages she likes.
+</ul>
+<p>
+You <strong>must authenticate any public keys received</strong> before
+using them. For remote sites, the simplest method is to exchange them
+using PGP-signed email (taking appropriate steps to authenticate the
+signing keys). For nearby machines, a floppy disk or trusted
+network is fine.</p>
+
+<h3><a name="useRSA">Using RSA signatures for authentication</a></h3>
+
+<p>
+For each system you will communicate with, you need an RSA public key and
+an identifier associated with it. The identifiers go in the <var>leftid=</var>
+and <var>rightid=</var> lines of connection descriptions in <var>ipsec.conf(5)</var>.
+They are the names the
+      systems use to identify themselves during connection negotiation.</p>
+<p>
+There are four possible forms for these identifiers:</p>
+<ul>
+    <li>an IP address in dotted quad notation, four numbers separated by
+          periods (10.1.19.32).</li>
+        <li>a domain name, which will be resolved immediately
+          (bad.example.com).</li>
+        <li>a fully qualified domain name (FQDN) with a leading "@" to
+          indicate that it should not be resolved (@good.example.com)</li>
+        <li>user@FQDN (fred@example.com)</li>
+      </ul>
+<p>
+We recommend that only the @FQDN form be used in most applications. IP
+      addresses make remarkably uninteresting names. Resolving a name to an IP
+      address is not interesting in this context, and attempting to resolve it
+      may cause problems if DNS is down or if someone subverts a DNS server
+      which you rely on.
+      <p>
+If your domain is example.com, the names you use should be of three
+      types:</p>
+      <ul>
+        <li>machine names such as "@firewall.example.com".</li>
+        <li>names for other resources, chosen not to conflict, such as
+          "@fireplug.example.com"</li>
+        <li>identifiers for people (actually for their road warrior machines),
+          such as "@alice.example.com" or, if she
+          prefers, "@cleopatra.example.com".</li>
+      </ul>
+<p>
+In order to facilitate distributing keys through DNS, we recommend
+      avoiding
+      <ul>
+        <li>names from non-existent domains</li>
+        <li>names from other people's domains</li>
+        <li>names which conflict with machine names in your domain</li>
+        <li>user@FQDN</li>
+      </ul>
+<p>
+      For example, if you have a server alice.example.com, then you should not
+      use  "@alice.example.com" to identify Alice's laptop for IPSEC.</li>
+</ul>
+
+
+<h2><a name="basic.conf">The configuration file</a></h2>
+
+<p>FreeS/WAN uses a configuration file, <a
+href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a>.</p>
+This section describes setting up the parts of that file that apply to all
+connections:
+<dl>
+  <dt><var>config setup</var> section</dt>
+    <dd>describes machine configuration</dd>
+  <dt><var>conn default</var> section</dt>
+    <dd>default parameters which apply to all connections</dd>
+</dl>
+<p>
+and gives an introduction to the parts of the file that specify the actual
+connections. The following section covers setting up three common types of
+connection, all using automatic keying
+with RSA authentication of the gateways:</p>
+  <dl>
+    <dt>conventional VPN</dt>
+      <dd>two security gateways, each with a known fixed IP address and with a
+        network of client machines behind it</dd>
+    <dt>Road Warrior</dt>
+      <dd>one player has a dynamically-assigned address</dd>
+    <dt>opportunistic encryption</dt>
+      <dd>the two machines have no prior knowledge of each other, but are set
+        up to secure connections whenever possible</dd>
+  </dl>
+
+  <p>Setup is quite similar for each of these, but details differ.</p>
+
+  <p>Other types of connections are covered in later sections.</p>
+
+  <p>The easiest way to create a connection is by editing one of our examples.
+  Here we will use the one in the installation <a
+  href="manpage.d/ipsec.conf.5.html">ipsec.conf</a> file. You could also start
+  with one from our <a href="examples">doc/examples</a> file if one of those
+  is closer to what you need to do.</p>
+
+  <h3><a name="setup.conf">The setup section of ipsec.conf(5)</a></h3>
+
+  <p>The first section of <a
+  href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> contains overall setup
+  parameters for IPSEC, which apply to all connections. In our example file,
+  it is:</p>
+<pre>
+# basic configuration
+config setup
+        # THIS SETTING MUST BE CORRECT or almost nothing will work;
+        # %defaultroute is okay for most simple cases.
+        interfaces=%defaultroute
+        # Debug-logging controls:  "none" for (almost) none, "all" for lots.
+        klipsdebug=none
+        plutodebug=none
+        # Use auto= parameters in conn descriptions to control startup actions.
+        plutoload=%search
+        plutostart=%search
+        # Close down old connection when new one using same ID shows up.
+        uniqueids=yes
+</pre>
+
+  <p>The variables set here are:</p>
+  <dl>
+    <dt>interfaces</dt>
+      <dd>Tells the <a href="glossary.html#KLIPS">KLIPS</a> IPSEC code in the Linux kernel
+        which network interface to use. The interfaces specified here are the
+        only ones this gateway machine will use to communicate with other
+        IPSEC gateways. <strong>If this is not correct, nothing
+        works.</strong>
+        <p>In many cases, the appropriate interface is just your default
+        connection to the world (the Internet, or your corporate network). In
+        these cases, you can use the default setting:</p>
+        <ul>
+          <li>interfaces=%defaultroute</li>
+        </ul>
+        <p>
+        To check what FreeS/WAN sees as the default route, you can use the
+        command <var>ipsec showdefaults</var>. You may need to compare this
+        with the output from <var>route -n</var> to get a more complete
+        picture.
+        <p>In other cases, you can name one or more specific interfaces to be
+        used by FreeS/WAN. For example:</p>
+        <ul>
+          <li>interfaces="ipsec0=eth0"</li>
+          <li>interfaces="ipsec0=eth0 ipsec1=ppp0"</li>
+        </ul>
+        Both tell KLIPS to use eth0 as ipsec0. The second one also supports
+        IPSEC over PPP.
+        <p>Note that</p>
+        <ul>
+          <li>Multiple tunnels do not require multiple interfaces. It is
+            possible, and even common, to have one ipsec interface carrying
+            traffic for many tunnels.</li>
+          <li>For PPP connections, you specify the virtual PPP interface (for
+            example <var>ppp0</var>) here, <strong>not</strong> the underlying
+            physical interface.</li>
+        </ul>
+        <p>If you need to discover interface names, use the command:</p>
+        <pre>        ifconfig</pre>
+        If you have PCMCIA or other interfaces that are not available at boot
+        time, special measures are required. See our <a
+        href="#dynamic">section</a> on that.</dd>
+    <dt>klipsdebug</dt>
+      <dd>Debugging setting for the KLIPS kernel code</dd>
+    <dt>plutodebug</dt>
+      <dd>Debugging setting for the Pluto key and connection negotiation
+        daemon.
+        <p><var>klipsdebug</var> and <var>plutodebug</var> can each be set to
+        "none" or to "all" in most circumstances. There are other options; see
+        the relevant man pages.</p>
+      </dd>
+    <dt>plutoload</dt>
+      <dd>List of connections to be automatically loaded into memory when
+        Pluto starts.</dd>
+    <dt>plutostart</dt>
+      <dd>List of connections to be automatically negotiated when Pluto
+        starts.
+        <p><var>plutoload</var> and <var>plutostart</var> can be quoted lists
+        of connection names, but are often set to <var>%search</var> as in our
+        example. Any connection with <var>auto=add</var> in its connection
+        definition is then loaded, and any connection with
+        <var>auto=start</var> is started.</p>
+        <p>In most cases, you want <var>plutostart=%search</var> here and
+        <var>auto=start</var> in your connection descriptions. That way when a
+        connection is broken, for example if one machine crashes or is taken
+        down for some reason, it will be reliably rebuilt. If only one end is
+        told to start the connection, then if the other end crashes, you may
+        lose the connection for a long time. The end that could rebuild does
+        not know it needs to.</p>
+        <p>The exception to the above is when you have many road warriors
+        connecting to a single gateway. Having the gateway trying to rebuild
+        tunnels to systems which are offline can waste considerable resources.
+        In this case, the gateway should have <var>auto=add</var> for all
+        connections, and let the remote systems start negotiations.</p>
+      </dd>
+    <dt>uniqueids</dt>
+      <dd>Controls whether two connections with the same subnet on the
+         remote end are allowed. Normally this is set to <var>yes</var>
+         so that when a remote system disconnects and reconnects, Pluto
+         will automatically take the old connection down.         
+  </dl>
+
+<h3><a name="conn.default">Connection defaults</a></h3>
+
+<p>
+There is a special name %default that lets you define things that apply
+to all connections. e.g. our example file has:</p>
+
+<pre>
+# defaults for subsequent connection descriptions
+conn %default
+        # How persistent to be in (re)keying negotiations (0 means very).
+        keyingtries=0
+        # How to authenticate gateways
+        authby=rsasig
+</pre>
+
+  <p>Variables set here are:</p>
+  <dl>
+    <dt>keyingtries</dt>
+      <dd>How persistent to be in (re)keying negotiations (0 means very).
+        <p>For testing, you might wish to set this to some small number,
+        perhaps even to 1, to avoid wasting resources on incorrectly set up
+        connections. In production, it is often set to zero (retry forever).
+        Keeping the connection up is what machine resources are for, so if a
+        connection is down you night as well waste resources retrying as waste
+        them by sitting idle. Of course some caution should be exercised with
+        this, since it can waste network resources as well.</p>
+      </dd>
+    <dt>authby=rsasig</dt>
+      <dd>authenticate gateways using RSA signatures. This is the preferred
+        method and is what we will use in this section's examples. An
+        alternate method is to use <a href="#prodsecrets">shared
+      secrets</a>.</dd>
+  </dl>
+
+  <p>Once you are finished testing, you can  edit these defaults, adding
+  anything that is standard for all gateways in your organisation.</p>
+
+<p>
+Previous versions of this document said:
+<blockquote>
+Note, however, that setting the <var>auto=</var> parameter in the default
+  connection description <strong>does not work</strong>. You cannot use
+  <var>auto=start</var> here to get all connections started automatically or
+  <var>auto=add</var> to get them all loaded. You must set that in the
+  individual connection descriptions.
+</blockquote>
+This restriction has been removed in FreeS/WAN 1.9. However, if the other end of
+the tunnel is an older version, the restriction will still apply there, so some
+caution is still required.
+
+
+  <h3><a name="edit.conn">Editing a connection description</a></h3>
+
+  <p>Edit our example connection to match what you want to do.  Rename it
+  appropriately for the connection you would like to build: "fred-susan",
+  "reno-van" or whatever. The name is the second string in the line that
+  begins with "conn", for example in:</p>
+  <pre>
+        conn snt
+</pre>
+<p>
+The connection name is "snt" (<strong>s</strong>ub<strong>n</strong>et <strong>t</strong>unnel)
+and to define another connection you make a
+copy with a new name such as:</p>
+
+  <pre>
+        conn reno-van
+</pre>
+<p>
+A sample connection description is:</p>
+<pre>
+# sample tunnel
+# The network here looks like:
+#   leftsubnet====left----leftnexthop......rightnexthop----right====rightsubnet
+# If left and right are on the same Ethernet, omit leftnexthop and rightnexthop.
+conn sample
+        # left security gateway (public-network address)
+        left=10.0.0.1
+        # next hop to reach right
+        leftnexthop=10.44.55.66
+        # subnet behind left (omit if there is no subnet)
+        leftsubnet=172.16.0.0/24
+        # right s.g., subnet behind it, and next hop to reach left
+        right=10.12.12.1
+        rightnexthop=10.88.77.66
+        rightsubnet=192.168.0.0/24
+        auto=start</pre>
+  We omit here the variables we have shown as set in the default connection
+  above. All of them could also be set here. If they are set in both places,
+  settings here take precedence. Defaults are used only if the specific
+  connection description has no value set.
+
+  <p>The network described above looks like this:</p>
+  <pre>
+         subnet 172.16.0.0/24              =leftsubnet
+                |
+         interface 172.16.0.something
+            left gateway machine
+         interface 10.0.0.1                =left
+                 |
+         interface 10.44.55.66             =leftnexthop
+              router
+         interface we don't know
+                 |
+            INTERNET
+                 |
+         interface we don't know
+              router
+         interface 10.88.77.66             =rightnexthop
+                 |
+         interface 10.12.12.1              =right
+            right gateway machine
+         interface 192.168.0.something
+                 |
+         subnet 192.168.0.0/24             =rightsubnet</pre>
+  You need to edit the connection description, inserting appropriate IP
+  addresses and subnet descriptions so that it describes your network.
+
+  <p>In most cases, you should use numeric IP addresses, not names, here. The
+  file syntax allows names to be used, but this creates an additional risk. If
+  someone can subvert the DNS service, then they can redirect packets whose
+  addresses are looked up via that service.</p>
+
+<p>
+Many of the variables in this file come in pairs such as "leftsubnet: and
+"rightsubnet", one for each end of the connection. The variables on the left
+side are:</p>
+  <dl>
+    <dt>left</dt>
+      <dd>The gateway's external interface, the one it uses to talk to the
+        other gateway. This can be <var>left=%defaultroute</var>.</dd>
+    <dt>leftnexthop</dt>
+      <dd>Where left should send packets whose destination is right, typically
+        the first router in the appropriate direction.
+        <p>This need not always be set.</p>
+        <ul>
+          <li>If the two gateways are directly linked (packets can go from one
+            to the other without IP routing by any intermediate device) then
+            you need not set either <var>leftnexthop</var> or
+            <var>rightnexthop</var>.</li>
+          <li>a connection with <var>left=%defaultroute</var> or
+            <var>right=%defaultroute</var> must not have the corresponding
+            <var>nexthop</var> parameter set</li>
+        </ul>
+        However, <em>in all other cases</em>, you <em>must</em> provide
+        nexthop information. KLIPS (Kernel IP Security) bypasses the normal
+        routing machinery, so you must give KLIPS the information even though
+        routing already knows it.
+        <p>(Yes, we know that design is not ideal, and we plan to change it.
+        See extensive discussions on the <a href="mail.html">mailing list</a>,
+        mostly with &quot;routing&quot; or &quot;KLIPS 2&quot; in the subject
+       lines.)</p>
+      </dd>
+    <dt>leftsubnet</dt>
+      <dd>Addresses for the machines which left is protecting.
+        <ul>
+          <li>Often something like 101.202.203.0/24 to indicate that a subnet
+            resides behind left. Often this subnet will be directly connected
+            to left, but this not necessary. The only requirement is that left
+            must be able to route to it.</li>
+          <li>If you omit the leftsubnet line, then left is both the security
+            gateway and the only client on that end.</li>
+        </ul>
+        For some applications, you may want to create two connections, one to
+        protect traffic from the subnet behind left and another to protect
+        traffic from the left gateway itself. This takes two connection
+        descriptions. See <a href="#multitunnel">below</a>.</dd>
+    <dt>leftfirewall</dt>
+      <dd>Set to "yes" if there is a firewall in play that suppresses
+        forwarding, for example if a subnet behind left uses non-routable
+        addresses and left does <a href="glossary.html#masq">IP masquerade</a> for them.
+        This will cause <a href="manpage.d/ipsec_pluto.8.html">Pluto</a>
+        to invoke our default script to adjust the firewall as required.
+        <p>
+        For more detail, including ways to invoke your own customised
+        script instead, see our <a href="firewall.html">FreeS/WAN and firewalls</a>
+        section.</p>
+      </dd>
+    <dt>auto</dt>
+      <dd>If the <var>conn setup</var> section has
+        <var>plutoload=%search</var>, then all connections marked
+        <var>auto=add</var> are loaded when Pluto starts.
+        <p>
+        If the <var>conn setup</var> section has
+        <var>plutostart=%search</var>, then all connections marked
+        <var>auto=start</var> are started when Pluto starts.</p>
+        <p>
+        Initially, we suggest using <var>auto=add</var> on
+        all connections. This lets you start them manually during
+        testing. Once they are tested, you can change many of them
+        to <var>auto=start</var>.
+      </dd>
+  </dl>
+
+  <p>For each left* parameter, there is a corresponding right* parameter.</p>
+
+  <p>Note that <em>a connection to a subnet behind left does not include left
+  itself</em>. The tunnel described above protects packets going <em>from one
+  subnet to the other</em>. It does not apply to packets which either begin or
+  end their journey on one of the gateways. If you need to protect those
+  packets, you must build separate tunnel descriptions for them.</p>
+
+  <p>It is a common error to attempt testing a subnet-to-subnet connection by
+  pinging from one of the gateways to the far end or vice versa. <strong>This
+  does not work</strong>, even if the connection is functioning perfectly,
+  because <em>traffic to or from the gateway itself is not sent on that
+  connection</em>. If you want to protect traffic originating or terminating
+  on the gateway, then you need a separate tunnel for that in addition to the
+  subnet's tunnel. See the section on <a href="#multitunnel">multiple
+  tunnels</a> below.</p>
+
+  <h3><a name="which">Which is which?</a></h3>
+
+  <p>Which security gateway is "left" and which is "right" is arbitrary.</p>
+
+  <p>We suggest that you name connections by their ends. For example, name the
+  link between Fred and Susan's machines "fred-susan" or the link between your
+  Reno and Vancouver offices "reno-van". You can then let "left" refer to the
+  left half of the name, "fred" or "reno" in our examples, and "right" to the
+  other half.</p>
+
+  <p>To simplify administration, we recommend that you <strong>use the same
+  names</strong> in the <var>ipsec.conf</var> files <strong>on both ends</strong>.
+  The name "reno", for example, should refer to the machine in Reno, no matter
+  which city the file is in, and if "reno" is "left" in the reno-van description
+  in Reno, then "reno" should be "left" in that description on the Vancouver
+  machine as well.
+<p> 
+Then when you copy the file from one machine to the other, the <em>only</em>
+change you should make on the second machine is changing the
+  <var>interfaces=</var> line to match the interface that machine
+  uses for IPSEC.</p>
+<p>
+Of course the software does not actually require this. The names are just
+arbitrary strings to it. If your administrator in Reno wants to refer to
+the machines as "Phobos" and "Demios" while the Vancouver admin calls them
+"George" and "Gracie", things should still work.</p> 
+
+<h2><a name="examples">Example setups</a></h2>
+
+<p>
+In this section we show examples of three common setups:
+<ul>
+<li>a VPN connection
+<li>road warrior support
+<li>opportunistic encryption
+</ul>
+<p>
+We use a, b, c ... to indicate components
+of IP addresses. Each letter is some number in the range 0 to 255,
+inclusive.</p>
+
+<p>
+For additional examples, see our <a href="examples">examples</a> file.</p>
+
+<h3><a name="VPNex">VPN</a></h3>
+
+<p>
+In this example, the network looks like this:</p>
+<pre>
+         subnet a.b.c.0/24                 =leftsubnet
+                |          (head office has routable IP addresses)
+         interface a.b.c.d
+            left gateway machine
+         interface e.f.g.h                 =left
+                 |         (external address outside a.b.c.0 subnet)
+         interface e.f.g.i               =leftnexthop
+              router
+         interface we don't know
+                 |
+            INTERNET
+                 |
+         interface we don't know
+              router
+         interface j.k.l.m                =rightnexthop
+                 |
+         interface j.k.l.n                =right
+            right gateway machine
+         interface 192.168.0.something
+                 |        (branch office uses private IP addresses)
+         subnet 192.168.0.0/24             =rightsubnet
+</pre>
+<p>
+The ipsec.conf(5) file might look like this (with RSA keys shortened
+for easy display):</p>
+<pre>
+# basic configuration
+config setup
+        interfaces=eth0
+        klipsdebug=none
+        plutodebug=none
+        plutoload=%search
+        plutostart=%search
+
+# defaults that apply to all connection descriptions
+conn %default
+        # How persistent to be in (re)keying negotiations (0 means very).
+        keyingtries=0
+        # How to authenticate gatways
+        authby=rsasig
+
+# VPN connection for head office and branch office
+conn head-branch
+        # identity we use in authentication exchanges
+        leftid=@head.example.com
+        leftrsasigkey=0x175cffc641f...
+        # left security gateway (public-network address)
+        left=e.f.g.h
+        # next hop to reach right
+        leftnexthop=e.f.g.i
+        # subnet behind left (omit if there is no subnet)
+        leftsubnet=a.b.c.0/24
+        # right s.g., subnet behind it, and next hop to reach left
+        rightid=@branch.example.com
+        rightrsasigkey=0xfc641fd6d9a24...
+        right=j.k.l.n
+        rightnexthop=j.k.l.m
+        rightsubnet=192.168.0.0/24
+        # right is masquerading
+        rightfirewall=yes
+        auto=start
+</pre>
+<p>
+The versions of this file at the two ends should be identical,
+except that each must have an <var>interfaces=</var> line
+appropriate for the local machine.</p>
+
+<h4><a name="route_or_not">Routable and non-routable addresses</a></h4>
+
+<p>
+RFC 1918 reserves three groups of addresses for use on private
+networks:
+<ul>
+	<li>10.0.0.0/8
+	<li>172.16.0.0/12
+	<li>192.168.0.0/16
+</ul>
+<p>
+Addresses in these ranges will never be assigned to anything on the
+Internet. Many routers automatically drop any packet with one of these
+addresses as either source or destination.
+<p>
+You can use FreeS/WAN to route between two such networks, using for
+example <var>leftsubnet=192.168.47.0/24</var> and
+<var>rightsubnet=192.168.48.0/24</var>. These addresses still do not
+appear on the Internet; they are encapsulated inside IPSEC packets
+which have the gateways' external addresses (from the <var>left</var>
+and <var>right</var> parameters of the connection description) in their
+headers.    
+
+<h3><a name="roadex">Road Warrior</a></h3>
+
+<p>
+For our purposes, a &quot;road warrior&quot; is any machine that
+does not have a fixed IP address where it can normally be expected to be
+on line. This includes:</p>
+<ul>
+<li>a traveller who might connect from anywhere</li>
+<li>any machine that has a dynamic IP address -- nearly all dialup connections
+and most DSL or cable modem connections, at least in North America</li>
+<li>most home machines connecting to the office. If you have a home firewall
+that is always left on and has a static IP address, then you can use the
+<a href="#VPNex">VPN</a> configuration described above. Otherwise, consider
+yourself a road warrior.</li>
+</ul>
+<p>
+The configuration for road warrior support looks slightly different
+from a VPN configuration. We cannot use the road warrior's IP address
+in the configuration file since we don't know it, and we don't want
+to have our server retrying connections to road warriors that are
+no longer online.</p>
+
+<p>
+In this example, the network looks like this:</p>
+<pre>
+         subnet a.b.c.0/24               =leftsubnet
+                |          (head office has routable IP addresses)
+         interface a.b.c.d
+            left gateway machine
+         interface e.f.g.h               =left
+                 |         (external address outside a.b.c.0 subnet)
+         interface e.f.g.i               =leftnexthop
+              router
+                 |
+            INTERNET
+                 |
+     interface with dynamic IP address
+          road warrior machine
+</pre>
+<p>
+Here the ipsec.conf(5) files on the two ends are slightly different.
+The one at the office might have exactly the same <var>config setuo</var>
+and <var>conn %default</var> sections as in the VPN example.</p>
+<pre>
+# basic configuration
+config setup
+        interfaces=eth0
+        klipsdebug=none
+        plutodebug=none
+        plutoload=%search
+        plutostart=%search
+
+# defaults that apply to all connection descriptions
+conn %default
+        # How persistent to be in (re)keying negotiations (0 means very).
+        keyingtries=0
+        # How to authenticate gatways
+        authby=rsasig
+</pre>
+
+<p>
+Then add a description for the road warrior connection:</p>
+<pre>
+# Connection for road warrior Fred 
+conn head-fred
+        # identity we use in authentication exchanges
+        leftid=@head.example.com
+        leftrsasigkey=0x175cffc641f...
+        # left security gateway (public-network address)
+        left=e.f.g.h
+        # next hop to reach right
+        leftnexthop=e.f.g.i
+        # subnet behind left (omit if there is no subnet)
+        leftsubnet=a.b.c.0/24
+        # accept any address for right
+        right=%any
+        # any address, provided authentication works
+        rightid=@fred.example.com
+        rightrsasigkey=0xd9a24765fe...
+        # no subnet for a typical road warrior
+        # it is possible, but usually not needed
+        # let the road warrior start the connection
+        auto=add
+        # override the default retry for road warriors
+        # we don't want to retry if IP connectivity is gone
+        keyingtries=1
+</pre>
+<p>
+On the gateway end we use</p>
+<ul>
+<li><var>right=%any</var> so we have no preset idea of right's IP address
+and will accept whatever arrives on the packets</li>
+<li><var>auto=add</var> so we accept connections but don't initiate</li>
+<li><var>keyingtries=1</var> so we do not retry to excess when the
+partner disconnects or changes IP address</li>
+</ul>
+<p>
+The file on the road warrior end is nearly identical, except
+that it has:
+<ul>
+<li><var>interfaces=%defaultroute</var> to handle the dynamic IP address.</li>
+<li><var>right=%defaultroute</var>
+<li><var>auto=start</var> to start the connection</li>
+<li><var>keyingtries=0</var> to try to maintain the connection</li>
+</ul>
+<p>
+Additional road warriors can be added as required. Each should have
+his or her own connection description with unique settings for 
+<var>rightid</var> and <var>rightrsasigkey</var>.</p>
+<p>
+Jean-Francois Nadeau's
+<a href="http://jixen.tripod.com/#Rw-Fwan-to-Fwan">Practical Configurations</a>
+document also has an example
+  of using RSA authentication for road warriors.</p>
+
+<h3><a name="oppex">Opportunistic encryption</a></h3>
+
+We use the term <a href="glossary.html">opportunistic encryption</a> for
+encryption which does not rely on any pre-arranged connection, hence does
+not require that the administrators of the two gateways involved communicate
+with each other (for example, to exchange keys) before their systems can
+create a secure connection.
+<p>
+The idea is that each gateway check the destinations of outgoing packets,
+see if an encrypted connection is possible and, if so, take the opportuntity
+to encrypt. The opportunity will exist whenever the admins on both ends have
+set their systems up for opportunistic encryption.  
+<p>
+This makes encryption the default behaviour, and could greatly
+increase the overall security of the Internet if it were widely enough adopted.
+See our documents:
+<dl>
+<dt><a href="politics.html">history and politics</a>
+<dd>for the reasons we want to do this
+<dt><a href="ipsec.html#traffic.resist">IPSEC protocols</a>
+<dd>for discussion of the general principle of encrypting as much as possible
+</dl> 
+<p>
+The gateways must be able to authenticate each other for IPSEC to be secure.
+For opportunistic encryption, we rely on the domain name system,
+<a href="glossary.html">DNS</a>, to provide the RSA keys needed for this
+authentication.  Note, that currently this is not entirely secure because
+<strong>the DNS mechanism it relies on is not fully secure</strong>.
+Eventually, as <a href="glossary.html#SDNS">secure DNS</a> becomes widely
+deployed, this will change.
+<h4><a name="opp.status">Status</a></h4>
+
+The team have been working on this for some time, and testing internally.
+As of late May, 2001 this code is ready for wider testing. <strong>We
+encourage everyone to try it.</strong>
+<p>
+The main documentation items so far are:
+<ul>
+<li>an <a href="opportunism.howto">Opportunism HowTo</a> by Pluto programmer
+Hugh Redelmeier
+<li>a <a href="opportunism.spec">design document</a> by Hugh and technical lead Henry Spencer.
+
+</ul>
+I am playing catch up. HTML documentation so far is neither complete nor
+particularly clear, and not all of it has had technical review
+by the developers, so it may have errors. What I have so far is below.
+<p>
+Note that both software and documentation for this are changing quickly.
+You may want the latest snapshot for opportunism experiments.
+<p> 
+<strong>We do not yet recommend this code for production use</strong>.
+You should still protect your critical data with explicitly configured
+IPSEC tunnels, rather than relying on opportunistic for everything at
+this stage. 
+</p> 
+
+<h4><a name="opp.config">ipsec.conf entries for opportunism</a></h4>
+
+The relevant lines in the config file might look like this:</p>
+<pre>
+conn subnet-to-anyone              # for our client subnet
+        leftsubnet=10.42.42.0/24   # any single client in our subnet
+        left=%defaultroute         # our SG (defaults leftnexthop too)
+        right=%opportunistic
+</pre>
+<p>
+The public key, in our format, must be in a KEY record of the appropriate
+DNS entry for this to work.</p>
+<p>
+Each opportunistic connection supports a single source/destination pair
+of IP addresses. There is no way to build an opportunistic connection
+for a larger subnet. Specifying a subnet in the connection description, 
+as in the example above, just means that any host in that subnet may
+have opportunistic connections.</p>
+
+<h4><a name="dns.background">Some DNS background</a></h4>
+
+<p>
+Opportunism requires that the gateway systems be able to fetch public keys, and
+other IPSEC-related information, from each other's DNS (domain name service)
+records.
+<p>
+DNS is a distributed database that maps names to IP addresses and vice versa.
+A system named gateway.example.com with IP address 10.20.30.40 should have at
+least two DNS records:
+<dl>
+<dt>gateway.example.com. IN A 10.20.30.40
+<dd>used to look up the name and get an IP address
+<dt>40.30.20.10.in-addr.arpa. IN PTR gateway.example.com.
+<dd>used for reverse lookups, looking up an address to get the associated name.
+Notice that the digits here are in reverse order; the actual address is
+10.20.30.40 but we use 40.30.20.10 here.
+</dl>
+Some syntactic details are:
+<ul>
+<li>the IN indicates that these records are for <strong>In</strong>ternet addresses
+<li>The final periods in '.com.' and '.arpa.' are required. They indicate the
+root of the domain name system.
+</ul>
+For much more detail, see:
+<ul>
+<li><a href="http://www.linuxdoc.org/LDP/nag2/index.html">Linux Network Administrator's Guide</a>
+<li>the standard <a href="biblio.html#DNS.book">DNS reference</a> book
+<li><a href="http://www.nominum.com/resources/whitepapers/bind-white-paper.html">BIND overview</a>
+<li><a href="http://www.nominum.com/resources/documentation/Bv9ARM.pdf">BIND 9 Administrator's Reference</a>
+</ul>
+The capitalised strings after IN indicate the type of record. Possible types include:
+<ul>
+<li><strong>A</strong>ddress
+<li><strong>P</strong>oin<strong>T</strong>e<strong>R</strong>
+<li><strong>C</strong>anonical <strong>NAME</strong>, records to support aliasing, 
+multiple names for one address
+<li><strong>MX</strong>, used in mail handling
+<li><strong>SIG</strong>nature, used in <a href="glossary.html#SDNS">secure DNS</a>
+<li><strong>KEY</strong>, used in <a href="glossary.html#SDNS">secure DNS</a>
+<li><strong>T</strong>e<strong>XT</strong>, a multi-purpose record type
+</ul>
+To set up for opportunistic encryption, you add some KEY and TXT records to your
+DNS data.
+
+<h4><a name="dnskey">Putting IPSEC information in DNS</a></h4>
+
+There are two types of DNS record to be added:
+<ul>
+<li>each gateway must have a KEY record which other gateways can query to
+fetch its RSA authentication key
+<li>any client whose communications are to be protected by a gateway
+must have a TXT record pointing to that machine as an authorised IPSEC gateway
+</ul>
+<a href="manpage.d/ipsec_showhostkey.8.html">ipsec_showhostkey(8)</a> provides
+the key in DNS record format. You will need to put it in the appropriate place
+in the DNS records.
+<p>
+To be more precise, quoting the Opportunism Design document:
+<pre>
+For reference, the minimum set of DNS records needed to make
+this all work is either:
+
+1.  TXT in Destination reverse  map,  identifying  Responder
+    and providing public key.
+2.  KEY in Initiator reverse map, providing public key.
+3.  TXT  in  Source  reverse  map, verifying relationship to
+    Initiator.
+
+or:
+
+1.  TXT in Destination reverse map, identifying Responder.
+2.  KEY in Responder reverse map, providing public key.
+3.  KEY in Initiator reverse map, providing public key.
+4.  TXT in Source reverse  map,  verifying  relationship  to
+    Initiator.
+
+Slight  complications  ensue  for dynamic addresses, lack of
+control over reverse maps, etc.
+</pre>
+<h5><a name=dns.client>DNS records for client systems</a></h5>
+
+You must have control of the reverse maps for your client systems,
+or opportunistic IPSEC cannot be made to work.
+<p>
+The client systems will be either Source or Destination, so 
+they must have:
+<pre>
+1.  TXT in Destination reverse  map,  identifying  Responder
+    and providing public key.
+2.  ...
+3.  TXT  in  Source  reverse  map, verifying relationship to
+    Initiator.
+
+or:
+
+1.  TXT in Destination reverse map, identifying Responder.
+2.  ...
+3.  ...
+4.  TXT in Source reverse  map,  verifying  relationship  to
+    Initiator.
+</pre>
+If you control the gateway's reverse map, example client records would look like this:
+<pre>
+42.42.42.10.in-addr.arpa. IN PTR deepthought.example.com.
+42.42.42.10.in-addr.arpa. IN TXT "X-IPsec-Server(10)=10.20.30.40 AQNJjkKlIk9...nYyUkKK8"
+</pre>
+which can also be written as just:
+<pre>
+42.42.42.10.in-addr.arpa. IN PTR deepthought.example.com.
+                          IN TXT "X-IPsec-Server(10)=10.20.30.40 AQNJjkKlIk9...nYyUkKK8"
+</pre>
+
+This provides the IP address of the security gateway and the public key
+which the gateway will use to authenticate itself. This is the preferred
+method. 
+
+<h5><a name=dns.gateway>DNS records for gateway systems</a></h5>
+
+The gateways will be either Initiator or Responder so they need:
+<pre>
+1.  ...
+2.  KEY in Initiator reverse map, providing public key.
+3.  ...
+
+or:
+
+1.  ...
+2.  KEY in Responder reverse map, providing public key.
+3.  KEY in Initiator reverse map, providing public key.
+4.  ...
+</pre>
+<p> 
+If you control the gateway's reverse map, you just add a KEY record there.
+That is all the gateway reverse map needs, whether it is working as
+Initiator or Responder.
+<p>
+Here is an example, with many characters of the key itself left out:
+<pre>
+40.30.20.10.in-addr.arpa. IN KEY 0x4200 4 1 AQNJjkKlIk9...nYyUkKK8
+</pre>
+This allows lookups on the IP address of the gateway to retrieve the key.
+
+<h6>If you <em>don't</em> control the gateway's reverse map</h6>
+
+The approach must be different if you do not have control over the reverse map
+for your gateway. Perhaps your ISP controls that,
+and provides no way for you to put data into their maps. Without that, you
+cannot set your gateway up to respond to incoming opportunistic requests
+(short of changing ISPs, which you might consider).
+<p>
+However, suppose a friend over at example.org will let you put things in
+their maps. That will allow you to set your gateway up to handle opportunistic
+connections for which it is the initiator.
+<p>
+You still need to be able to put data in the reverse map for your clients.
+However, that data is slightly different:
+<pre>
+42.42.42.10.in-addr.arpa. IN PTR deepthought.example.com.
+                          IN TXT "X-IPsec-Server(10)=something.example.org"
+</pre>
+Over at example.org, your friend puts these lines in the DNS data files:
+<pre>
+something.example.org. IN A 10.20.30.40
+something.example.org. IN KEY 0x4200 4 1 AQNJjkKlIk9...nYyUkKK8
+</pre>
+Your gateway must identify itself in IKE as something.example.org, not
+as gateway.example.com. You set that up via <var>leftid=</var> or
+<var>rightid=</var> entries in <a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a>.
+<p>
+With this arrangement, the remote gateway receives an ID payload early in IKE
+with your (bogus) gateway name "something.example.org". Then it looks up that name
+to get the IP address and key for the gateway.
+
+
+
+
+<h2><a name="handy">Simplifying ipsec.conf files</a></h2>
+
+<p>
+We provide several features in the syntax of the
+<a  href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file that are intended
+to simplify the work of managing complex multi-connection setups:</p>
+  <ul>
+    <li>a <var>conn %default</var> connection description for information
+      common to all connections</li>
+    <li><var>also=</var> lines allow a piece of a description to be defined in
+      one place and used in several (the definition must be after all
+      references)</li>
+    <li><var>include</var> directives allow information to be stored in
+      separate files but used as part of the configuration</li>
+  </ul>
+
+<p>
+These can be combined in whatever way suits your application. One example
+is this ipsec.conf file for a gateway supporting multiple road warriors,
+all using RSA authentication:</p>
+<pre>
+conn %default
+        type=tunnel
+        pfs=yes
+        keylife=2h
+        authby=rsasig                   # all connections use RSA authentication
+        keyingtries=1                   # road warrior can retry, we shouldn't
+        # some parameters are common to all remote systems
+        right=%any                      # accept from any address
+
+# pick up all remote system descriptions
+# uses shell wildcards
+include /etc/ipsec/remote.*.conn
+
+# left side of all connections is the same
+# define it after the descriptions which use it
+conn leftstuff
+        left=101.101.101.101
+        leftnexthop=101.101.101.1
+        leftsubnet=202.202.202.0/24
+        leftid=@gateway.example.org
+</pre>
+<p>
+On the left gateway, we can omit <var>leftrsasig</var>. That gateway uses
+the private key stored in </var>ipsec.secrets(5)</var> and has no need for
+its own public key. Similarly, the road warriors need not have their own
+public keys in ipsec.conf(5), only the gateway's public key.
+<p>
+The remote connection descriptions in <var>/etc/ipsec/remote.*.conn</var>
+need then have only a few lines each:
+<pre>
+conn myname
+        # pick up common info for all connections
+        also=leftstuff
+        # identify the remote machine
+        rightid=@myname.example.org
+        rightrsasigkey=0xfc641fd6d9a24...
+        # we cannot use auto= in default or an also= section
+        # so do it here
+        auto=add                       # load, but don't start
+</pre>
+<p>
+Note that if <var>auto=add</var> or <var>auto=start</var> parameters are
+used, they <strong>must be in the actual connection descriptions</strong>.
+Neither putting them in the <var>conn default</var> section nor including
+them via an <var>also=</var> line will work.</p>
+<p>
+Also, be careful with the order of sections in this file. The parser
+used requires that a definition comes after the <var>also=</var> line
+which uses it. In our example, the <var>include</var> inserts the
+files with the <var>also=leftstuff</var> lines before the definition
+of <var>conn leftstuff</var> so things are parsed in the correct
+order.</p>
+
+
+<h2><a name="fw.basic">Is there a firewall in play?</a></h2>
+
+<p>
+If firewall packet filtering is being done on either of the FreeS/WAN
+gateway machines, or on any machine on the path between them, then you will
+probably need to adjust the filters before FreeS/WAN can work. The filters
+must allow:</p>
+  <ul>
+    <li>UDP packets between port 500 on one gate and port 500 on the other,
+      used by the automatic keying daemon Pluto.</li>
+    <li>at least one of protocol 50 (ESP) and 51 (AH). Most applications want
+      ESP since AH does only authentication, not encryption.</li>
+  </ul>
+<p>
+For more detail, see our <a href="firewall.html">IPSEC and firewalls</a>
+document.
+
+<h2><a name="testing">Testing the installation</a></h2>
+
+<p>
+This section covers testing connections once you have FreeS/WAN installed
+and your <a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file
+set up.</p>
+<p>
+We assume all your connection descriptions use <var>auto=add</var> so that
+<a href="manpage.d/ipsec_pluto.8.html">ipsec_pluto(8)</a> loads the
+descriptions into its internal database at startup but does not attempt to
+start the connections until you tell it to.</p>
+
+<h3><a name="matching">Matching numbers</a></h3>
+
+<p>
+It is important that the numbers in your connection descriptions match the
+network configuration. FreeS/WAN is almost certain to fail if they do not.
+<p>
+Suppose you are at the Reno office and your ipsec.conf file now has, among
+others, these lines:</p>
+<pre>
+config setup
+        interfaces="ipsec0=eth0"
+
+conn reno-van
+        left=101.101.101.101
+        right=202.202.202.202
+</pre>
+<p>
+When you tell FreeS/WAN to start the reno-van connection, it doesn't
+automagically know that it is in Reno, or that it is <var>left</var> in the
+configuration. It discovers that by comparing the IP address for ipsec0
+(and, if it is set, for ipsec1) to the addresses for left and right. ipsec0
+inherits its address from the underlying device, eth0 in our example.</p>
+
+<p>
+So in our example, if eth0 has IP address 101.101.101.101 then ipsec0
+inherits that address, the correct match is found, and this FreeS/WAN
+discovers that it is <var>left</var>. (If no match is found,
+<a href="manpage.d/ipsec_pluto.8.html">Pluto</a>
+reports &quot;unable to orient connection&quot;.) 
+It then sets itself up with any
+other left* parameters in use -- some of <var>leftnexthop</var>,
+<var>leftsubnet</var>, <var>leftfirewall</var> and <var>leftid</var>.
+<p>
+Once it has these parameters, FreeS/WAN sets things so that
+  <ul>
+    <li>packets from leftsubnet addressed to rightsubnet are routed through a
+      tunnel to right.</li>
+    <li>Packets for leftsubnet can be received on the tunnel and
+    delivered.</li>
+  </ul>
+<p>
+All should be well.</p>
+
+  <p>
+Of course, there must also be interfaces and routes set up so that this
+machine can exchange IP packets both with the right gateway and with clients
+on leftsubnet. This is done with standard Linux utilities such as ifconfig(8)
+and route(8). Also, things must be correct on right in Vancouver. It takes
+two to tunnel.</p>
+
+<p>
+A data mismatch anywhere in this configuration will cause FreeS/WAN to
+fail and to log various error messages. Depending on just how confused
+  FreeS/WAN is and about what, the error messages may be somewhat confusing.
+  See our <a href="trouble.html">troubleshooting</a> section to get help
+  interpreting them if required.</p>
+
+<p>
+<em>We recommend double-checking for consistency here before starting
+actual tests.</em>.</p>
+
+<h3><a name="testsetup">Sanity checking</a></h3>
+
+<p>
+Reboot both gateways to get FreeS/WAN started. No connections are
+actually made yet, but the stage is set.</p>
+
+<p>
+Examine /var/log/messages for any signs of trouble.</p>
+
+<p>
+On both gateways, the following entries should now exist in the
+/proc/net/ directory:</p>
+  <ul>
+    <li>ipsec_eroute</li>
+    <li>ipsec_spi</li>
+    <li>ipsec_spigrp</li>
+    <li>ipsec_spinew</li>
+    <li>ipsec_tncfg</li>
+    <li>ipsec_version</li>
+  </ul>
+
+<p>
+and the IPSEC interfaces should be attached on top of the specified
+physical interfaces. Confirm that with:</p>
+<pre>
+        cat /proc/net/ipsec_tncfg
+</pre>
+
+<p>
+You should see at least device ipsec0, and each ipsec device should point
+to a physical device, eg. 'ipsec0 -&gt; eth0 mtu=16260 -&gt; 1500'. Routing
+connections through this pseudo-device with our eroute(8) utility causes the
+data to be encrypted before being delivered to the underlying network
+interface.</p>
+
+<p>
+Don't be surprised when you cannot find that /dev/ipsec0 or /dev/ipsec1.
+They do not exist. Other
+network pseudo-devices such as eth0 and eth1 do not have entries in /dev
+either. In general, network devices do not need such entries.</p>
+
+<h3><a name="test">Starting a connection</a></h3>
+
+<p>
+On one gateway, start IPSEC with:</p>
+<pre>
+        ipsec auto --up <var>name</var>
+</pre>
+<p>
+replacing <var>name</var> with the connection name you used in
+ipsec.conf(5).</p>
+
+<p>
+Note that to shut down a connection, you must do:</p>
+<pre>
+        ipsec auto --down <var>name</var>
+</pre>
+<p>
+on <em>both</em> gateway machines, even though you only start it from
+one.</p>
+
+
+<p>
+If the <var>ipsec auto --up</var> command doesn't generate any errors,
+do</p>
+<pre>
+        ipsec look
+</pre>
+
+<p>
+and see if the output looks something like this:</p>
+<pre>
+foo.spsystems.net Wed Nov 25 22:51:45 EST 1998
+-------------------------
+10.0.1.0/24 -&gt; 11.0.1.0/24 =&gt; tun0x200@11.0.0.1 esp0x202@11.0.0.1
+-------------------------
+tun0x200@11.0.0.1 IPv4_Encapsulation: dir=out   10.0.0.1 -&gt; 11.0.0.1
+esp0x203@10.0.0.1 3DES-MD5-96_Encryption: dir=in  iv=0xc2cbca5ba42ffbb6  seq=0  bit=0x00000000  win=0  flags=0x0&lt;&gt;
+esp0x202@11.0.0.1 3DES-MD5-96_Encryption: dir=out  iv=0xc2cbca5ba42ffbb6  seq=0  bit=0x00000000  win=0  flags=0x0&lt;&gt;
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+11.0.0.0        0.0.0.0         255.255.255.0   U      1500 0          0 eth1
+11.0.1.0        11.0.0.1        255.255.255.0   UG     1404 0          0 ipsec0</pre>
+
+<p>
+If it does, you're probably in business.</p>
+
+<p>
+This example shows:</p>
+<pre>
+        a tunnel              tun0x200 going to 11.0.0.1
+        outgoing connection   esp0x202
+        incoming connection   esp0x203
+</pre>
+
+<p>
+Both connections use <a href="glossary.html#ESP">ESP</a> with <a href="glossary.html#3DES">3DES</a>
+encryption and <a href="glossary.html#MD5">MD5</a> authentication.</p>
+
+<p>
+The routing is:</p>
+<pre>
+        11.0.0.0    via eth1 and the Internet
+        11.0.1.0    via ipsec0 which encrypts and then sends to 11.0.0.1
+</pre>
+<p>
+This routes all traffic to the protected network 11.0.1.0/24 through an IPSEC
+tunnel to the gateway 11.0.0.1.</p>
+
+<h3><a name="pingtest">Ping tests</a></h3>
+
+<p>
+If that works, test whether Sunrise can ping Sunset and vice versa. Our
+  example setup again is:</p>
+
+<pre>
+        Sunset==========West------------------East=========Sunrise
+              local net       untrusted net       local net
+</pre>
+
+<p>
+There is no point in testing to or from the gateways themselves;
+the goal is to secure traffic between the subnets, not between the security
+gateways themselves.</p>
+
+<p>
+In general, pings or other <strong>tests using the public interfaces of
+East and/or West are entirely useless</strong>. The IPSEC tunnel is for
+packets between the two protected subnets and the outside interfaces are not
+on those subnets. Depending on your routing configuration, test packets sent
+via those interfaces will be:</p>
+  <ul>
+    <li>either transmitted in the clear, bypassing the tunnel,</li>
+    <li>or discarded because there is no tunnel in place to handle them</li>
+  </ul>
+<p>
+In either case, <strong>they tell you nothing about the tunnel</strong>.</p>
+
+<p>
+Sometimes it will be inconvenient to use the client machines (Sunrise and
+  Sunset in our example) for testing. In these cases, use a command such
+  as:</p>
+<pre>
+     traceroute -i eth0 -f 20 192.168.7.1
+</pre>
+
+<p>
+where each of the interfaces specified (eth0 and 192.168.7.1 in the
+example) are <strong>on one of the protected subnets</strong>, eth0 being
+the local gateway's interface on that side and 192.168.7.1 the remote
+gateway's subnet interface. This forces the packets through the IPSEC tunnel
+you want to test.</p>
+
+<p>
+For information on setting things up so that gateways can do IPSEC to
+each other or to remote subnets, see <a href="#multitunnel">below</a>.</p>
+
+  <p>If you have other software set up, test with it as well. Telnet from
+  Sunrise to Sunset, browse a web server on the remote net and so on.</p>
+
+<h3><a name="tcpdump">Testing with tcpdump</a></h3>
+
+<p>
+To verify that all is working, run tcpdump(8) on a machine which can
+listen to the traffic between the gateways.</p>
+
+<p>
+This is most easily done from a third machine, rather than from one of the
+gateways. On the gateways you may see packets at intermediate stages of
+processing and the result may be confusing.
+<p>
+If the results make no sense at all, or you see "bad physical medium" error
+messages, you probably have an outdated version of tcpdump(8) that does
+not handle IPSEC at all. See our <a href="faq.html#tcpdump">FAQ</a>.</p>
+
+<p>
+The packets should, except for some of the header information, be utterly
+unintelligible. The output of good encryption looks exactly like random
+noise.</p>
+
+  <p>You can put recognizable data in the ping packets with something
+  like:</p>
+  <pre>        ping -p feedfacedeadbeef 11.0.1.1</pre>
+
+<p>
+"feedfacedeadbeef" is a legal hexadecimal pattern that is easy to pick
+out of hex dumps.</p>
+
+<p>
+For many other protocols, you need to check if you have encrypted data or
+ASCII text. Encrypted data has approximately equal frequencies for all 256
+possible characters. ASCII text has most characters in the printable range
+0x20-0x7f, a few control characters less than 0x20, and none at all in the
+range 0x80-0xff.</p>
+
+<p>
+0x20, space, is a good character to look for. In normal English text
+space occurs about once in seven characters, versus about once in 256 for
+random or encrypted data. You can put long sequences of spaces in your data
+and look for 0x20202020 in output, but this is not usually necessary.</p>
+
+<p>
+If packets look like total garbage, nothing recognizable, all is
+well.
+</p>
+
+  <p>Note that to shut down a connection, you must do:</p>
+  <pre>        ipsec auto --down <var>name</var></pre>
+
+  <p>on <em>both</em> gateway machines, even though you only start it from
+  one.</p>
+
+  <p>Again, you can verify with the same commands.</p>
+
+  <p>Repeat the ping test. Repeat the tcpdump test.</p>
+
+  <p>If everything succeeds, congratulations.</p>
+
+  <p><strong>You now have a working Linux FreeS/WAN installation.</strong></p>
+
+
+<h2><a name="links.conf">What next?</a></h2>
+
+<p>
+At this point you should have a working FreeS/WAN setup. If not, you could
+go back and doublecheck various things above or try:<p>
+<ul>
+<li>our <a href="faq.html">FAQ</a></li>
+<li>our <a href="trouble.html">troubleshooting</a> section</li>
+</ul>
+<p>
+If all is well so far, you could continue with this section to explore
+other ways to configure FreeS/WAN connections or branch out to:</p>
+<ul>
+<li>more detail on the <a href="ipsec.html">IPSEC protocols</a></li>
+<li><a href="interop.html">interoperating</a> with other IPSEC implementations</li>
+<li><a href="politics.html">history and politics of cryptography</a></li>
+<li>additional <a href="examples">configuration examples</a>
+</ul>
+<p>
+Of course you might just go off for a beverage or meal at this point as well.</p>
+
+<h2><a name="otherconf">Other configuration possibilities</a></h2>
+
+<p>
+The rest of this section describes various less-used options for FreeS/WAN.</p>
+
+ 
+<h3><a name="choose">Choosing connection types</a></h3>
+
+<p>
+The first major decision you need to make before configuring additional
+connections is what type or types of connections you will use. There are several
+options, and you can use more than one concurrently.</p>
+
+  <h4><a name="man-auto">Manual vs. automatic keying</a></h4>
+
+<p>
+IPSEC allows two types of connections, with manual or automatic keying.
+FreeS/WAN starts them with commands such as:</p>
+<pre>
+        ipsec manual --start <var>name</var>
+        ipsec auto --up <var>name</var>
+</pre>
+
+  <p>The difference is in how they are keyed.</p>
+  <dl>
+    <dt><a href="glossary.html#manual">Manually keyed</a> connections</dt>
+      <dd>use keys stored in <a
+        href="manpage.d/ipsec.conf.5.html">ipsec.conf</a>.</dd>
+    <dt><a href="glossary.html#auto">Automatically keyed</a> connections</dt>
+      <dd>use keys automatically generated by the Pluto
+        key negotiation daemon. The key negotiation protocol, <a
+        href="glossary.html#IKE">IKE</a>, must authenticate the other system. (It is
+        vulnerable to a <a href="glossary.html#middle">man-in-the-middle attack</a> if used
+        without authentication.) We currently support two authentication
+        methods:
+        <ul>
+          <li>using shared secrets stored in <a
+            href="manpage.d/ipsec.secrets.5.html">ipsec.secrets</a>.</li>
+          <li>RSA <a href="glossary.html#public">public key</a> authentication, with public
+            keys for other machines in <a
+            href="manpage.d/ipsec.conf.5.html">ipsec.conf</a> and our
+            machine's private key in <a
+            href="manpage.d/ipsec.secrets.5.html">ipsec.secrets</a>.</li>
+        </ul>
+      </dd>
+  </dl>
+
+<p>
+<a href="glossary.html#manual">Manually keyed</a> connections provide weaker security
+than <a href="glossary.html#auto">automatically keyed</a> connections. An opponent who
+gets a key gets all data encrypted by it. We discuss using
+<a href="#prodman">manual keying in production</a> below, but this is
+<strong>not recommended</strong> except in special circumstances, such as
+needing to communicate with some implementation that offers no auto-keyed
+mode compatible with FreeS/WAN. Manual keying is useful for testing.</p>
+
+<p>
+With automatically-(re)-keyed connections, the keys change often so an
+opponent who gets one key does not get a large amount of data. An opponent
+who gets a shared secret, or your private key if public key authentication
+is used, does not automatically gain access to any encryption keys or any
+data. Once your authentication mechanism has been subverted you have no way
+to prevent the attacker getting keys and data, but the attacker still has to
+work for them.</p>
+
+<h4><a name="auto-auth">Authentication methods for auto-keying</a></h4>
+
+<p>
+The IKE protocol which Pluto uses to negotiate connections between
+gateways must use some form of authentication of peers. A gateway must know
+who it is talking to before it can create a secure connection. We currently
+support two methods for this authentication:</p>
+  <ul>
+    <li>shared secrets</li>
+    <li>RSA authentication</li>
+  </ul>
+<p>
+  See our <a href="web.html#patch">links section</a> for information on
+  user-contributed patches which provide a third mechanism:</p>
+  <ul>
+    <li>authentication with <a href="glossary.html#x509">x.509</a> certificates</li>
+  </ul>
+
+<p>
+As a long-term goal, FreeS/WAN plans to support distribution of public
+keys for authentication via <a href="glossary.html#SDNS">secure DNS</a>. This would allow
+us to support <a href="glossary.html#carpediem">opportunistic encryption</a>. Any two
+FreeS/WAN gateways could provide secure communication, without either of them having
+any preset information about the other.</p>
+
+  <p>This is <strong>not implemented in this release</strong>.</p>
+
+  <h4><a name="adv-pk">Advantages of public key methods</a></h4>
+
+  <p>
+Authentication with a <a href="glossary.html#public">public key</a> method such as
+<a href="glossary.html#RSA">RSA</a> has some important advantages over using shared
+  secrets.</p>
+  <ul>
+    <li>no problem of secure transmission of secrets
+      <ul>
+        <li>A shared secret must be shared, so you have the problem of
+          transmitting it securely to the other party. If you get this wrong,
+          you have no security.</li>
+        <li>With a public key technique, you transmit only your public key.
+          The system is designed to ensure that it does not matter if an enemy
+          obtains public keys. The private key never leaves your machine.</li>
+      </ul>
+    </li>
+    <li>easier management
+      <ul>
+        <li>Suppose you have 20 branch offices all connecting to one gateway at
+          head office, and all using shared secrets. Then the head office admin
+          has 20 secrets to manage. Each of them must be kept secret not only
+          from outsiders, but also from 19 of the branch office admins. The
+          branch office admins have only one secret each to manage.</p>
+        <p>
+          If the branch offices need to talk to each other, this becomes
+          problematic. You need another <nobr>20*19/2 = 190</nobr> secrets for branch-to-branch
+          communication, each known to exactly two branches. Now all the branch
+          admins have the headache of handling 20 keys, each shared with exactly
+          one other branch or with head office.
+        <p>
+          For larger numbers of branches, the number of connections and secrets
+          increases quadratically  and managing them becomes a nightmare. A
+          1000-gateway fully connected network needs 499,500 secrets, each
+          known to exactly two players. There are ways to reduce this problem,
+          for example by introducing a central key server, but these involve
+          additional communication overheads, more administrative work, and
+          new threats that must be carefully guarded against.</p>
+        </li>
+        <li>With public key techniques, the <em>only</em> thing you have to
+          keep secret is your private key, and <em>you keep that secret from
+          everyone</em>.
+          <p>
+          As network size increaes, the number of public keys used increases linearly
+          with the number of nodes. This still requires careful administration in large
+          applications, but is nothing like the disaster of a quadratic increase. On a
+          1000-gateway network, you have 1000 private keys, each of which must be kept
+          secure on one machine, and 1000 public keys which must be distributed. This
+          is not a trivial problem, but it is manageable.
+         </li>
+      </ul>
+    </li>
+    <li>does not require fixed IP addresses
+      <ul>
+        <li>When shared secrets are used in IPSEC, the responder must be able
+          to tell which secret to use by looking at the IP address on the
+          incoming packets.  When the other parties do not have a fixed IP
+          address to be identified by (for example, on nearly all dialup ISP
+          connections and many cable or ADSL links), this does not work well
+          -- all must share the same secret!</li>
+        <li>When RSA authentication is in use, the initiator can identify
+          itself by name before the key must be determined.  The responder
+          then checks that the message is signed with the public key
+          corresponding to that name.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <p>There is also a disadvantage:</p>
+  <ul>
+    <li>your private key is a single point of attack, extremely valuable to an
+      enemy
+      <ul>
+        <li>with shared secrets, an attacker who steals your ipsec.secrets
+          file can impersonate you or try <a
+          href="glossary.html#middle">man-in-the-middle</a> attacks, but can only attack
+          connections described in that file</li>
+        <li>an attacker who steals your private key gains the chance to attack
+          not only existing connections <em>but also any future
+          connections</em> created using that key</li>
+      </ul>
+    </li>
+  </ul>
+
+  <p>This is partly counterbalanced by the fact that the key is never
+  transmitted and remains under your control at all times. It is likely
+  necessary, however, to take account of this in setting security policy. For
+  example, you should change gateway keys when an administrator leaves the
+  company, and should change them periodically in any case.</p>
+
+ <p>
+Overall, public key methods are <strong>more secure, more easily managed
+and more flexible</strong>. We recommend that they be used for all
+connections, unless there is a compelling reason to do otherwise.</p>
+
+<h3><a name="prodsecrets">Using shared secrets in production</a></h3>
+
+<p>
+Generally, public key methods are preferred for reasons given above, but
+shared secrets can be used with no loss of security, just more work and
+perhaps more need to take precautions.</p>
+
+<h4><a name="secrets">Putting secrets in ipsec.secrets(5)</a></h4>
+
+<p>
+If shared secrets are to be used to
+<a href="glossary.html#authentication">authenticate</a> communication for the
+<a href="glossary.html#DH">Diffie-Hellman</a> key exchange in the <a href="glossary.html#IKE">IKE</a>
+protocol, then those secrets must be stored in <var>/etc/ipsec.secrets</var>. For details, see the
+<a href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a> man page.</p>
+
+<p>A few considerations are vital:</p>
+  <ul>
+    <li>make the secrets long and unguessable. Since they need not be
+      remembered by humans, very long ugly strings may be used. We suggest
+      using our <a href="manpage.d/ipsec_ranbits.8.html">ipsec_ranbits(8)</a>
+      utility to generate long (128 bits or more) random strings.</li>
+    <li>transmit secrets securely. You have to share them with other systems,
+      but you lose if they are intercepted and used against you. Use <a
+      href="glossary.html#PGP">PGP</a>, <a href="glossary.html#SSH">SSH</a>, hand delivery of a floppy
+      disk which is then destroyed, or some other trustworthy method to
+      deliver them.</li>
+    <li>store secrets securely, in root-owned files with permissions
+    rw------.</li>
+    <li>limit sharing of secrets. Alice, Bob, Carol and Dave may all talk to
+      each other, but only Alice and Bob should know the secret for an
+      Alice-Bob link.</li>
+    <li><strong>do not share private keys</strong>. The private key for RSA
+      authentication of your system is stored in
+      <a href="manpage.d#ipsec.secrets.5.html">ipsec.secrets(5)</a>, but it
+      is a different class of secret from the pre-shared keys used for the
+      &quot;shared secret&quot; authentication. No-one but you should have
+      the RSA private key.
+  </ul>
+
+
+<p>
+Each line has the IP addresses of the two gateways plus the secret. It
+  should look something like this:</p>
+<pre>
+        10.0.0.1 11.0.0.1 : PSK "jxTR1lnmSjuj33n4W51uW3kTR55luUmSmnlRUuWnkjRj3UuTV4T3USSu23Uk55nWu5TkTUnjT"
+</pre>
+<p>
+<var>PSK</var> indicates the use of a <strong>p</strong>re-<strong>s</strong>hared 
+<strong>k</strong>ey. The quotes and the whitespace shown are required.
+<p>
+You can use any character string as your secret. For security, it should be
+both long and extremely hard to guess. We provide a utility to generate such
+strings, <a href="manpage.d/ipsec_ranbits.8.html">ipsec_ranbits(8)</a>.
+
+<p>
+You want the same secret on the two gateways used, so you create a line
+with that secret and the two gateway IP addresses. The installation process
+supplies an example secret, useful <em>only</em> for testing. You must
+change it for production use.</p>
+
+<h4><a name="securing.secrets">File security</a></h4>
+<p>
+You must deliver this file, or the relevant part of it, to the other
+gateway machine by some <strong>secure</strong> means. <em>Don't just FTP
+or mail the file!</em> It is vital that the secrets in it remain
+secret. An attacker who knew those could easily have <em>all the data on
+your "secure" connection</em>.</p>
+
+<p>
+This file must be owned by root and should have
+permissions <var>rw-------</var>.</p>
+
+<h4><a name="notroadshared">Shared secrets for road warriors</a></h4>
+<p>
+You can use a shared secret to support a single road warrior connecting
+to your gateway, and this is a reasonable thing to do in some circumstances.
+Public key methods have advantages, discussed <a href="#choose">above</a>,
+but they are not critical in this case.</p>
+<p>
+To do this, the line in ipsec.secrets(5) is something like:
+<pre>
+        10.0.0.1 0.0.0.0 : PSK "jxTR1lnmSjuj33n4W51uW3kTR55luUmSmnlRUuWnkjRj3UuTV4T3USSu23Uk55nWu5TkTUnjT"
+</pre>
+where the <var>0.0.0.0</var> means that any IP address is acceptable.
+
+<p>
+<strong>For more than one road warrior, shared secrets are <em>not</em>
+recommended.</strong> If shared secrets are used, then when the
+responder needs to look up the secret, all it knows about the sender is
+an IP address. This is fine if the sender is at a fixed IP address specified
+in the config file. It is also fine if only one road warrior uses the
+wildcard <var>0.0.0.0</var> address. However, if you have more than one
+road warrior using shared secret authentication, then they must all use
+that wildcard and therefore <strong>all road warriors using PSK autentication
+must use the same secret</strong>. Obviously, this is insecure.
+<p>
+<strong>For multiple road warriors, use public key authentication.</strong>
+Each roadwarrior can then have its own identity (our <var>leftid=</var>
+or <var>rightid=</var> parameters), its own public/private key pair, and
+its own secure connection.
+</p>
+
+<h3><a name="prodman">Using manual keying in production</a></h3>
+
+<p>
+Generally, <a href="glossary.html#auto">automatic keying</a> is preferred over
+<a href="glossary.html#manual">manual keying</a> for production use because it
+is both easier to manage and more secure. Automatic keying frees the admin
+from much of the burden of managing keys securely, and can provide
+<a href="glossary.html#PFS">perfect forward secrecy</a>.</p>
+
+<p>
+However, it is possible to use manual keying in production if that is
+what you want to do. This might be necessary, for example, in order to
+interoperate with some device that either does not provide automatic keying
+or provides it in some version we cannot talk to.</p>
+
+<p>
+Note that with manual keying <strong>all security rests with the
+keys</strong>. If an adversary acquires your keys, you've had it. He or she
+can read everything ever sent with those keys, including old messages he or
+she may have archived. You need to <strong>be really paranoid about
+  keys</strong> if you're going to rely on manual keying for anything
+  important.</p>
+  <ul>
+    <li>keep keys in files with 600 permissions, owned by root</li>
+    <li>be extremely careful about security of your gateway systems.
+      Anyone who breaks into a gateway and gains root privileges can
+      get all your keys and read everything ever encrypted
+      with those keys, both old messages he has archived and any new ones
+      you may send.
+    <li>change keys regularly. This can be a considerable bother, (and
+       provides an excellent reason to consider automatic keying instead),
+       but it is <em>absolutely essential</em> for security. Consider a manually
+       keyed system in which you leave the same key in place for months:
+       <ul>
+         <li>an attacker can have a very large sample of text sent with that
+           key to work with. This makes various cryptographic attacks much
+           more likely to succeed.
+         <li>The chances of the key being compromised in some non-cryptographic
+           manner -- a spy finds it on a discarded notepad, someone breaks into
+           your server or your building and steals it, a staff member is bribed,
+           tricked, seduced or coerced into revealing it, etc. -- also increase
+           over time.
+         <li>a successful attacker can read everything ever sent with that key.
+           This makes any successful attack extremely damaging.
+       </ul>
+       It is clear that you must change keys often to have any useful security.
+       The only question is how often.
+    </li>
+    <li>use <a href="glossary.html#PGP">PGP</a> or <a href="glossary.html#SSH">SSH</a> for all key
+      transfers</li>
+    <li>don't edit files with keys in them when someone can look over your
+      shoulder</li>
+    <li>worry about network security; could someone get keys by snooping
+      packets on the LAN between your X desktop and the gateway?</li>
+    <li>lock up your backup tapes for the gateway system</li>
+    <li>... and so on</li>
+  </ul>
+<p>
+Linux FreeS/WAN provides some facilities to help with this. In particular,
+it is good policy to <strong>keep keys in separate files</strong> so you can
+edit configuration information in /etc/ipsec.conf without exposing keys to
+&quot;shoulder surfers&quot; or network snoops. We support this with the
+<var>also=</var> and <var>include</var> syntax in
+ <a href="manpage.d/ipsec_conf.5.html">ipsec.conf(5)</a>.</p>
+
+<p>
+See the last example in our <a href="examples">examples</a> file. In the
+  /etc/ipsec.conf <var>conn samplesep</var> section, it has the line:</p>
+<pre>
+        also=samplesep-keys
+</pre>
+<p>
+which tells the "ipsec manual" script to insert the configuration
+description labelled "samplesep-keys" if it can find it. The /etc/ipsec.conf
+file must also have a line such as:</p>
+
+<pre>
+include ipsec.*.conf
+</pre>
+
+<p>
+which tells it to read other files. One of those other files then
+might contain the additional data:</p>
+<pre>
+conn samplesep-keys
+  spi=0x200
+  esp=3des-md5-96
+  espenckey=0x01234567_89abcdef_02468ace_13579bdf_12345678_9abcdef0
+  espauthkey=0x12345678_9abcdef0_2468ace0_13579bdf
+</pre>
+
+<p>
+The first line matches the label in the "also=" line, so the indented
+lines are inserted. The net effect is exactly as if the inserted lines
+had occurred in the original file in place of the "also=" line.</p>
+
+<p>Variables set here are:</p>
+  <dl>
+    <dt>spi</dt>
+      <dd>A number needed by the manual keying code. Any 3-digit hex number
+        will do, but if you have more than one manual connection then
+        <strong>spi must be different</strong> for each connection.</dd>
+    <dt>esp</dt>
+      <dd>Options for <a href="glossary.html#ESP">ESP</a> (Encapsulated Security Payload),
+        the usual IPSEC encryption mode. Settings here are for <a
+        href="glossary.html#encryption">encryption</a> using <a href="glossary.html#3DES">triple DES</a>
+        and <a href="glossary.html#authentication">authentication</a> using <a
+        href="glossary.html#MD5">MD5</a>. Note that encryption without authentication
+        should not be used; it is insecure.</dd>
+    <dt>espenkey</dt>
+      <dd>Key for ESP encryption. Here, a 192-bit hex number for triple
+      DES.</dd>
+    <dt>espauthkey</dt>
+      <dd>Key for ESP authentication. Here, a 128-bit hex number for MD5.
+      </dd>
+  </dl>
+ <p>
+<strong>Note</strong> that the <strong>example keys we supply</strong>
+are intended <strong>only for testing</strong>. For real use, you
+should go to automatic keying. If that is not possible, create your
+own keys for manual mode and keep them secret
+ 
+<p>Of course, any files containing keys <strong>must</strong> have 600
+permissions and be owned by root.</p>
+
+<p>
+If you connect in this way to multiple sites, we recommend that you keep
+  keys for each site in a separate file and adopt some naming convention that
+  lets you pick them all up with a single "include" line. This minimizes the
+  risk of losing several keys to one error or attack and of accidentally
+  giving another site admin keys which he or she has no business knowing.</p>
+
+  <p>Also note that if you have multiple manually keyed connections on a
+  single machine, then the <var>spi</var> parameter must be different for each
+  one. Any 3-digit hex number is OK, provided they are different for each
+  connection. We reserve the range 0x100 to 0xfff for manual connections.
+  Pluto assigns SPIs from 0x1000 up for automatically keyed connections.</p>
+
+  <p>If <a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> contains keys
+  for manual mode connections, then it too must have permissions
+  <var>rw-------</var>. We recommend instead that, if you must manual keying
+  in production, you keep the keys in separate files.</p>
+
+<p>
+Note also that <a href="manpage.d/ipsec.conf.5.html">ipsec.conf</a> is
+installed with permissions <var>rw-r--r--</var>. If you plan to use manually
+  keyed connections for anything more than initial testing, you
+  <b>must</b>:</p>
+  <ul>
+    <li>either change permissions to <var>rw-------</var></li>
+    <li>or store keys separately in secure files and access them via include
+      statements in <a href="manpage.d/ipsec.conf.5.html">ipsec.conf</a>.
+  </ul>
+<p>
+We recommend the latter method for all but the simplest configurations.<p>
+
+<h4><a name="ranbits">Creating keys with ranbits</a></h4>
+
+  <p>You can create new <a href="glossary.html#random">random</a> keys with the <a
+  href="manpage.d/ipsec_ranbits.8.html">ranbits(8)</a> utility. For example,
+  the commands:</p>
+  <pre>      umask 177
+      ipsec ranbits 192  &gt; temp
+      ipsec ranbits 128 &gt;&gt; temp</pre>
+
+  <p>create keys in the sizes needed for our default algorithms:</p>
+  <ul>
+    <li>192-bit key for <a href="glossary.html#3DES">3DES</a> encryption <br>
+      (only 168 bits are used; parity bits are ignored)</li>
+    <li>128-bit key for keyed <a href="glossary.html#MD5">MD5</a> authentication</li>
+  </ul>
+
+  <p>If you want to use <a href="glossary.html#SHA">SHA</a> instead of <a
+  href="glossary.html#MD5">MD5</a>, that requires a 160-bit key</p>
+
+  <p>Note that any <strong>temporary files</strong> used must be kept
+  <strong>secure</strong> since they contain keys. That is the reason for the
+  umask command above. The temporary file should be deleted as soon as you are
+  done with it. You may also want to change the umask back to its default
+  value after you are finished working on keys.</p>
+
+  <p>The ranbits utility may pause for a few seconds if not enough entropy is
+  available immediately. See ipsec_ranbits(8) and random(4) for details. You
+  may wish to provide some activity to feed entropy into the system. For
+  example, you might move the mouse around, type random characters, or do
+  <var>du /usr &gt; /dev/null</var> in the background.</p>
+
+<h3><a name="boot">Setting up connections at boot time</a></h3>
+
+  <p>You can tell the system to set up connections automatically at boot time
+  by putting suitable stuff in /etc/ipsec.conf on both systems. The relevant
+  section of the file is labelled by a line reading <var>config
+  setup</var>.</p>
+
+  <p>Details can be found in the <a
+  href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> man page. We also
+  provide a file of <a href="examples">example configurations</a>.</p>
+
+  <p>The most likely options are something like:</p>
+
+  <p></p>
+  <dl>
+    <dt>interfaces="ipsec0=eth0 ipsec1=ppp0"</dt>
+      <dd>Tells KLIPS which interfaces to use. Up to four interfaces numbered
+        ipsec[0-3] are supported. Each interface can support an arbitrary
+        number of tunnels.
+        <p>Note that for PPP, you give the ppp[0-9] device name here, not the
+        underlying device such as modem (or eth1 if you are using PPPoE).</p>
+      </dd>
+    <dt>interfaces=%defaultroute</dt>
+      <dd>Alternative setting, useful in simple cases. KLIPS will pick up both
+        its interface and the next hop information from the settings of the
+        Linux default route.</dd>
+    <dt>forwardcontrol=no</dt>
+      <dd>Normally "no". Set to "yes" if the IP forwarding option is disabled
+        in your network configuration. (This can be set as a kernel
+        configuration option or later. e.g. on Redhat, it's in
+        /etc/sysconfig/network and on SuSE you can adjust it with Yast.) Linux
+        FreeS/WAN will then enable forwarding when starting up and turn it off
+        when going down. This is used to ensure that no packets will be
+        forwarded before IPSEC comes up and takes control.</dd>
+    <dt>syslog=daemon.error</dt>
+      <dd>Used in messages to the system logging daemon (syslogd) to specify
+        what type of software is sending the messages. If the settings are
+        "daemon.error" as in our example, then syslogd treats the messages as
+        error messages from a daemon.
+        <p>Note that <a href="glossary.html#Pluto">Pluto</a> does not currently pay
+        attention to this variable. The variable controls setup messages
+        only.</p>
+      </dd>
+    <dt>klipsdebug=</dt>
+      <dd>Debug settings for <a href="glossary.html#KLIPS">KLIPS</a>.</dd>
+    <dt>plutodebug=</dt>
+      <dd>Debug settings for <a href="glossary.html#Pluto">Pluto</a>.</dd>
+    <dt>... for both the above DEBUG settings</dt>
+      <dd>Normally, leave empty as shown above for no debugging output.<br>
+        Use "all" for maximum information.<br>
+        See ipsec_klipsdebug(8) and ipsec_pluto(8) man page for other options.
+        Beware that if you set /etc/ipsec.conf to enable debug output, your
+        system's log files may get large quickly.</dd>
+    <dt>dumpdir=/safe/directory</dt>
+      <dd>Normally, programs started by ipsec setup don't crash. If they do,
+        by default, no core dump will be produced because such dumps would
+        contain secrets. If you find you need to debug such crashes, you can
+        set dumpdir to the name of a directory in which to collect the core
+        file.</dd>
+    <dt>manualstart=</dt>
+      <dd>List of manually keyed connections to be automatically started at
+        boot time. Useful for testing, but not for long term use. Connections
+        which are automatically started should also be automatically
+      re-keyed.</dd>
+    <dt>pluto=yes</dt>
+      <dd>Whether to start <a href="glossary.html#Pluto">Pluto</a> when ipsec startup is
+        done.<br>
+        This parameter is optional and defaults to "yes" if not present.
+        <p>"yes" is strongly recommended for production use so that the keying
+        daemon (Pluto) will automatically re-key the connections regularly.
+        The ipsec-auto parameters ikelifetime, ipseclifetime and reykeywindow
+        give you control over frequency of rekeying.</p>
+      </dd>
+    <dt>plutoload="reno-van reno-adam reno-nyc"</dt>
+      <dd>List of tunnels (by name, e.g. fred-susan or reno-van in our
+        examples) to be loaded into Pluto's internal database at startup. In
+        this example, Pluto loads three tunnels into its database when it is
+        started.
+        <p>If plutoload is "%search", Pluto will load any connections whose
+        description includes "auto=add" or "auto=start".</p>
+      </dd>
+    <dt>plutostart="reno-van reno-adam reno-nyc"</dt>
+      <dd>List of tunnels to attempt to negotiate when Pluto is started.
+        <p>If plutostart is "%search", Pluto will start any connections whose
+        description includes "auto=start".</p>
+        <p>Note that, for a connection intended to be permanent, <strong>both
+        gateways should be set try to start</strong> the tunnel. This allows
+        quick recovery if either gateway is rebooted or has its IPSEC
+        restarted. If only one gateway is set to start the tunnel and the
+        other gateway restarts, the tunnel may not be rebuilt.</p>
+      </dd>
+    <dt>plutowait=no</dt>
+      <dd>Controls whether Pluto waits for one tunnel to be established before
+        starting to negotiate the next. You might set this to "yes"
+        <ul>
+          <li>if your gateway is a very limited machine and you need to
+            conserve resources.</li>
+          <li>for debugging; the logs are clearer if only one connection is
+            brought up at a time</li>
+        </ul>
+        For a busy and resource-laden production gateway, you likely want "no"
+        so that connections are brought up in parallel and the whole process
+        takes less time.</dd>
+  </dl>
+
+  <p>The example assumes you are at the Reno office and will use IPSEC to
+  Vancouver, New York City and Amsterdam.</p>
+
+  <h3><a name="multitunnel">Multiple tunnels between the same two gateways</a></h3>
+
+  <p>Consider a pair of subnets, each with a security gateway, connected via
+  the Internet:</p>
+
+<pre>
+         192.168.100.0/24           left subnet
+              |
+         192.168.100.1
+         North Gateway
+         101.101.101.101            left
+              |
+         101.101.101.1              left next hop
+         [Internet]
+         202.202.202.1              right next hop
+              |
+         202.202.202.202            right
+         South gateway
+         192.168.200.1
+              |
+         192.168.200.0/24           right subnet
+</pre>
+
+<p>A tunnel specification such as:</p>
+
+<pre>
+conn northnet-southnet
+      left=101.101.101.101
+      leftnexthop=101.101.101.1
+      leftsubnet=192.168.100.0/24
+      leftfirewall=yes
+      right=202.202.202.202
+      rightnexthop=202.202.202.1
+      rightsubnet=192.168.200.0/24
+      rightfirewall=yes
+</pre>
+will allow machines on the two subnets to talk to each other. You might test
+this by pinging from polarbear (192.168.100.7) to penguin (192.168.200.5).
+
+<p>
+However, <strong>this does not cover other traffic you might want to
+secure</strong>. To handle all the possibilities, you might also want these
+connection descriptions:</p>
+
+<pre>
+conn northgate-southnet
+      left=101.101.101.101
+      leftnexthop=101.101.101.1
+      right=202.202.202.202
+      rightnexthop=202.202.202.1
+      rightsubnet=192.168.200.0/24
+      rightfirewall=yes
+
+conn northnet-southgate
+      left=101.101.101.101
+      leftnexthop=101.101.101.1
+      leftsubnet=192.168.100.0/24
+      leftfirewall=yes
+      right=202.202.202.202
+      rightnexthop=202.202.202.1
+</pre>
+
+<p>
+Without these, neither gateway can do IPSEC to the remote subnet. There
+is no IPSEC tunnel or eroute set up for the traffic.</p>
+
+<p>
+In our example, with the non-routable 192.168.* addresses used, packets
+would simply be discarded. In a different configuration, with routable
+addresses for the remote subnet, <strong>they would be sent
+unencrypted</strong> since there would be no IPSEC eroute and there would be
+a normal IP route.</p>
+
+<p>
+You might also want:</p>
+
+<pre>
+conn northgate-southgate
+      left=101.101.101.101
+      leftnexthop=101.101.101.1
+      right=202.202.202.202
+      rightnexthop=202.202.202.1
+</pre>
+
+<p>
+This is required if you want the two gateways to speak IPSEC to each
+other.</p>
+<p>
+This requires a lot of duplication of details.  Judicious use of <var>also=</var>
+and <var>include</var> can reduce this problem.</p>
+<p>
+Note that, while FreeS/WAN supports all four tunnel types, not all implementations
+do. In particular, some versions of Windows 2000 and the freely downloadable version
+of PGP provide only &quot;client&quot; functionality. You cannot use them as
+gateways with a subnet behind them. To get that functionality, you must upgrade
+to Windows 2000 server or the commercially available PGP products.
+
+<h4><a name="advroute">One tunnel plus advanced routing</a></h4>
+
+It is also possible to use the new routing features in 2.2 and later
+kernels to avoid most needs for multple tunnels. Here is one mailing
+list message on the topic:
+<pre>
+Subject: Re: linux-ipsec: IPSec packets not entering tunnel?
+   Date: Mon, 20 Nov 2000
+   From: Justin Guyett &lt;jfg@sonicity.com&gt;
+
+On Mon, 20 Nov 2000, Claudia Schmeing wrote:
+
+&gt; Right                                                         Left
+&gt;                      "home"                "office"
+&gt; 10.92.10.0/24 ---- 24.93.85.110 ========= 216.175.164.91 ---- 10.91.10.24/24
+&gt;
+&gt; I've created all four tunnels, and can ping to test each of them,
+&gt; *except* homegate-officenet.
+
+I keep wondering why people create all four tunnels.  Why not route
+traffic generated from home to 10.91.10.24/24 out ipsec0 with iproute2?
+And 99% of the time you don't need to access "office" directly, which
+means you can eliminate all but the subnet&lt;-&gt;subnet connection.
+</pre>
+and FreeS/WAN technical lead Henry Spencer's comment:
+<pre>
+&gt; I keep wondering why people create all four tunnels.  Why not route
+&gt; traffic generated from home to 10.91.10.24/24 out ipsec0 with iproute2?
+
+This is feasible, given some iproute2 attention to source addresses, but
+it isn't something we've documented yet... (partly because we're still
+making some attempt to support 2.0.xx kernels, which can't do this, but
+mostly because we haven't caught up with it yet).
+
+&gt; And 99% of the time you don't need to access "office" directly, which
+&gt; means you can eliminate all but the subnet&lt;-&gt;subnet connection.
+
+Correct in principle, but people will keep trying to ping to or from the
+gateways during testing, and sometimes they want to run services on the
+gateway machines too.
+
+</pre>
+
+<h3><a name="biggate">Many tunnels from a single gateway</a></h3>
+
+<p>
+FreeS/WAN allows a single gateway machine to build tunnels to many
+others. There may, however, be some problems for large numbers as indicated
+in this message from the mailing list:</p>
+
+<pre>
+Subject: Re: Maximum number of ipsec tunnels?
+   Date: Tue, 18 Apr 2000
+   From: "John S. Denker" &lt;jsd@research.att.com&gt;
+
+Christopher Ferris wrote:
+
+&gt;&gt; What are the maximum number ipsec tunnels FreeS/WAN can handle??
+
+Henry Spencer wrote:
+
+&gt;There is no particular limit.  Some of the setup procedures currently
+&gt;scale poorly to large numbers of connections, but there are (clumsy)
+&gt;workarounds for that now, and proper fixes are coming.
+
+1) "Large" numbers means anything over 50 or so.  I routinely run boxes
+with about 200 tunnels.  Once you get more than 50 or so, you need to worry
+about several scalability issues:
+
+a) You need to put a "-" sign in syslogd.conf, and rotate the logs daily
+not weekly.
+
+b) Processor load per tunnel is small unless the tunnel is not up, in which
+case a new half-key gets generated every 90 seconds, which can add up if
+you've got a lot of down tunnels.
+
+c) There's other bits of lore you need when running a large number of
+tunnels.  For instance, systematically keeping the .conf file free of
+conflicts requires tools that aren't shipped with the standard freeswan
+package.
+
+d) The pluto startup behavior is quadratic.  With 200 tunnels, this eats up
+several minutes at every restart.   I'm told fixes are coming soon.
+
+2) Other than item (1b), the CPU load depends mainly on the size of the
+pipe attached, not on the number of tunnels.
+</pre>
+<p>
+It is worth noting that item (1b) applies only to repeated attempts to
+re-key a data connection (IPSEC SA, Phase 2) over an established keying
+connection (ISAKMP SA, Phase 1). There are two ways to reduce
+this overhead using settings in <a href="manpage.d#ipsec.conf.5.html">ipsec.conf(5)</a>:
+<ul>
+<li>set <var>keyingtries</var> to some small value to limit repetitions
+<li>set <var>keylife</var> to a short time so that a failing data connection
+   will be cleaned up when the keying connection is reset.
+</ul> 
+<p>
+The overheads for establishing keying connections (ISAKMP SAs, Phase 1)
+are lower because for these Pluto does not perform expensive operations
+before receiving a reply from the peer.</p>
+
+<h3><a name="extruded">Extruded Subnets</a></h3>
+
+  <p>What we call <a href="glossary.html#extruded">extruded subnets</a> are a special case
+  of <a href="#VPN">VPNs</a>.</p>
+
+  <p>If your buddy has some unused IP addresses, in his subnet far off at the
+  other side of the Internet, he can loan them to you... provided that the
+  connection between you and him is fast enough to carry all the traffic
+  between your machines and the rest of the Internet.  In effect, he
+  "extrudes" a part of his address space over the network to you, with your
+  Internet traffic appearing to originate from behind his Internet
+  gateway.</p>
+
+  <p>Suppose your friend has a.b.c.0/24 and wants to give you a.b.c.240/28.
+  The initial situation is:</p>
+  <pre>    subnet           gateway          Internet
+  a.b.c.0/24    a.b.c.1    p.q.r.s</pre>
+  where anything from the Internet destined for any machine in a.b.c.0/24 is
+  routed via p.q.r.s and that gateway knows what to do from there.
+<p>
+Of course it is quite normal for various smaller subnets to exist
+behind your friend's gateway. For example, your friend's company
+might have a.b.c.16/28=development, a.b.c.32/28=marketing and so on.
+The Internet neither knows not cares about this; it just delivers
+packets to the p.q.r.s and lets the gateway do whatever needs to be
+done from there.
+<p>
+What we want to do is take a subnet, perhaps a.b.c.240/28, out of your
+friend's physical location <em>while still having your friend's gateway
+route to it</em>. As far as the
+  Internet is concerned, you remain behind that gateway.</p>
+  <pre>    subnet           gateway          Internet       your gate  extruded
+
+  a.b.c.0/24   a.b.c.1     p.q.r.s              d.e.f.g         a.b.c.240/28                
+
+                           ========== tunnel ==========</pre>
+
+  <p>The extruded addresses have to be a complete subnet.</p>
+
+  <p>In our example, the friend's security gateway is also his Internet
+  gateway, but this is not necessary. As long as all traffic from the Internet
+  to his addresses passes through the Internet gate, the security gate could
+  be a machine behind that. The IG would need to route all traffic for the
+  extruded subnet to the SG, and the SG could handle the rest.</p>
+
+  <p>First, configure your subnet using the extruded addresses.  Your security
+  gateway's interface to your subnet needs to have an extruded address
+  (possibly using a Linux <a href="glossary.html#virtual">virtual interface</a>, if it also
+  has to have a different address). Your gateway needs to have a route to the
+  extruded subnet, pointing to that interface.  The other machines at your
+  site need to have addresses in that subnet, and default routes pointing to
+  your gateway.</p>
+
+  <p>If any of your friend's machines need to talk to the extruded subnet,
+  <em>they</em> need to have a route for the extruded subnet, pointing at his
+  gateway.</p>
+
+  <p>Then set up an IPSEC subnet-to-subnet tunnel between your gateway and
+  his, with your subnet specified as the extruded subnet, and his subnet
+  specified as "0.0.0.0/0".  Do it with manual keying first for testing, and
+  then with automatic keying for production use.</p>
+
+  <p>The tunnel description should be:</p>
+<pre>
+conn extruded
+        left=p.q.r.s
+        leftsubnet=0.0.0.0/0
+        right=d.e.f.g
+        rightsubnet=a.b.c.0/28
+</pre>
+
+  <p>
+If either side was doing firewalling for the extruded subnet before the
+  IPSEC connection is set up, ipsec_manual and ipsec_auto need to know about
+  that (via the {left|right}firewall parameters) so that it can be overridden
+  for the duration of the connection.</p>
+
+  <p>
+And it all just works.  Your SG routes traffic for 0.0.0.0/0 -- that is,
+  the whole Internet -- through the tunnel to his SG, which then sends it
+  onward as if it came from his subnet.  When traffic for the extruded subnet
+  arrives at his SG, it gets sent through the tunnel to your SG, which passes
+  it to the right machine.</p>
+
+  <p>
+Remember that when ipsec_manual or ipsec_auto takes a connection down, it
+  <em>does not undo the route</em> it made for that connection. This lets you
+  take a connection down and bring up a new one, or a modified version of the
+  old one, without having to rebuild the route it uses and without any risk of
+  packets which should use IPSEC accidentally going out in the clear. Because
+  the route always points into KLIPS, the packets will always go there.
+  Because KLIPS temporarily has no idea what to do with them (no eroute for
+  them), they will be discarded.</p>
+
+  <p>If you <em>do</em> want to take the route down, this is what the
+  "unroute" operation in manual and auto is for.  Just do an unroute after
+  doing the down.</p>
+
+  <p>Note that the route for a connection may have replaced an existing
+  non-IPSEC route. Nothing in Linux FreeS/WAN will put that pre-IPSEC route
+  back. If you need it back, you have to create it with the route command.</p>
+
+<h3><a name="roadvirt">Road Warrior with virtual IP address</a></h3>
+
+  <p>
+Here is a mailing list message about another way to configure for road
+warrior support:</p>
+  <pre>
+Subject: Re: linux-ipsec: understanding the vpn
+   Date: Thu, 28 Oct 1999 10:43:22 -0400
+   From: Irving Reid &lt;irving@nevex.com&gt;
+
+&gt;  local-------linux------internet------mobile
+&gt;  LAN        box                         user
+&gt;  ...
+
+&gt;  now when the mobile user connects to the linux box
+&gt;  it is given a virtual IP address, i have configured it to
+&gt;  be in the 10.x.x.x range. mobile user and linux box 
+&gt;  have a tunnel between them with these IP addresses.
+
+&gt;   Uptil this all is fine.
+
+If it is possible to configure your mobile client software *not* to
+use a virtual IP address, that will make your life easier. It is easier
+to configure FreeS/WAN to use the actual address the mobile user gets
+from its ISP.
+
+Unfortunately, some Windows clients don't let you choose.
+
+&gt;  what i would like to know is that how does the mobile
+&gt;  user communicate with other computers on the local
+&gt;  LAN , of course with the vpn ?
+
+&gt;   what IP address should the local LAN 
+&gt;  computers have ? I guess their default gateway 
+&gt;  should be the linux box ? and does the linux box need
+&gt;  to be a 2 NIC card box or one is fine.
+
+As someone else stated, yes, the Linux box would usually be the default
+IP gateway for the local lan.
+
+However...
+
+If you mobile user has software that *must* use a virtual IP address,
+the whole picture changes. Nobody has put much effort into getting
+FreeS/WAN to play well in this environment, but here's a sketch of one
+approach:
+
+Local Lan 1.0.0.0/24
+    |
+    +- Linux FreeS/WAN 1.0.0.2
+    |
+    | 1.0.0.1
+ Router
+    | 2.0.0.1
+    |
+Internet
+    |
+    | 3.0.0.1
+Mobile User
+      Virtual Address: 1.0.0.3
+
+Note that the Local Lan network (1.0.0.x) can be registered, routable
+addresses.
+
+Now, the Mobile User sets up an IPSec security association with the
+Linux box (1.0.0.2); it should ESP encapsulate all traffic to the
+network 1.0.0.x **EXCEPT** UDP port 500. 500/udp is required for the key
+negotiation, which needs to work outside of the IPSec tunnel.
+
+On the Linux side, there's a bunch of stuff you need to do by hand (for
+now). FreeS/WAN should correctly handle setting up the IPSec SA and
+routes, but I haven't tested it so this may not work...
+
+The FreeS/WAN conn should look like:
+
+conn mobile
+        right=1.0.0.2
+        rightsubnet=1.0.0.0/24
+        rightnexthop=1.0.0.1
+        left=0.0.0.0  # The infamous "road warrior"
+        leftsubnet=1.0.0.3/32
+
+Note that the left subnet contains *only* the remote host's virtual
+address.
+
+Hopefully the routing table on the FreeS/WAN box ends up looking like
+this:
+
+% netstat -rn
+Kernel IP routing table
+Destination     Gateway      Genmask         Flags   MSS Window  irtt Iface
+1.0.0.0         0.0.0.0      255.255.255.0   U      1500 0          0 eth0
+127.0.0.0       0.0.0.0      255.0.0.0       U      3584 0          0 lo
+0.0.0.0         1.0.0.1      0.0.0.0         UG     1500 0          0 eth0
+1.0.0.3         1.0.0.1      255.255.255.255 UG     1433 0          0 ipsec0
+
+So, if anybody sends a packet for 1.0.0.3 to the Linux box, it should
+get bundled up and sent through the tunnel. To get the packets for
+1.0.0.3 to the Linux box in the first place, you need to use "proxy
+ARP".
+
+How this works is: when a host or router on the local Ethernet segment
+wants to send a packet to 1.0.0.3, it sends out an Ethernet level
+broadcast "ARP request". If 1.0.0.3 was on the local LAN, it would
+reply, saying "send IP packets for 1.0.0.3 to my Ethernet address".
+
+Instead, you need to set up the Linux box so that _it_ answers ARP
+requests for 1.0.0.3, even though that isn't its IP address. That
+convinces everyone else on the lan to send 1.0.0.3 packets to the Linux
+box, where the usual FreeS/WAN processing and routing take over.
+
+% arp -i eth0 -s 1.0.0.3 -D eth0 pub
+
+This says, if you see an ARP request on interface eth0 asking for
+1.0.0.3, respond with the Ethernet address of interface eth0.
+
+Now, as I said at the very beginning, if it is *at all* possible to
+configure your client *not* to use the virtual IP address, you can avoid
+this whole mess.</pre>
+
+  <h3><a name="dynamic">Dynamic Network Interfaces</a></h3>
+
+  <p>Sometimes you have to cope with a situation where the network
+  interface(s) aren't all there at boot. The common example is notebooks with
+  PCMCIA.</p>
+
+  <h4><a name="basicdyn">Basics</a></h4>
+
+  <p>The key issue here is that the <var>config setup</var> section of the
+  <var>/etc/ipsec.conf</var> configuration file lists the connection between
+  ipsecN and hardware interfaces, in the <var>interfaces=</var> variable. At
+  any time when <var>ipsec setup start</var> or <var>ipsec setup restart</var>
+  is run this variable <strong>must</strong> correspond to the current real
+  situation. More precisely, it <strong>must not</strong> mention any hardware
+  interfaces which don't currently exist. The difficulty is that an <var>ipsec
+  setup start</var> command is normally run at boot time so interfaces that
+  are not up then are mis-handled.</p>
+
+  <h4><a name="bootdyn">Boot Time</a></h4>
+<p>
+Normally, an <var>ipsec setup start</var> is run at boot time. However, if
+the hardware situation at boot time is uncertain, one of two things must be
+done.</p>
+  <ul>
+    <li>One possibility is simply not to have IPSEC brought up at boot time.
+      To do this:
+      <pre>        chkconfig --level 2345 ipsec off</pre>
+      That's for modern Red Hats or other Linuxes with chkconfig. Systems
+      which lack this will require fiddling with symlinks in /etc/rc.d/rc?.d
+      or the equivalent.</li>
+    <li>Another possibility is to bring IPSEC up with no interfaces, which is
+      less aesthetically satisfying but simpler.  Just put
+<pre>
+        interfaces=
+</pre>
+      in the configuration file.  KLIPS and Pluto will be started, but won't
+      do anything.</li>
+  </ul>
+
+  <h4><a name="changedyn">Change Time</a></h4>
+
+  <p>When the hardware *is* in place, IPSEC has to be made aware of it.
+  Someday there may be a nice way to do this.</p>
+
+  <p>Right now, the way to do it is to fix the <var>/etc/ipsec.conf</var> file
+  appropriately, so <var>interfaces</var> reflects the new situation, and then
+  restart the IPSEC subsystem. This does break any existing IPSEC
+  connections.</p>
+
+  <p>If IPSEC wasn't brought up at boot time, do</p>
+  <pre>        ipsec setup start</pre>
+  while if it was, do
+  <pre>        ipsec setup restart</pre>
+  which won't be as quick.
+
+  <p>If some of the hardware is to be taken out, before doing that, amend the
+  configuration file so interfaces no longer includes it, and do</p>
+  <pre>        ipsec setup restart</pre>
+
+  <p>Again, this breaks any existing connections.</p>
+
+<h3><a name="unencrypted">Unencrypted tunnels</a></h3>
+
+<p>
+Sometimes you might want to create a tunnel without encryption. Often this is
+a bad idea, even if you have some data which need not be private. See
+this <a href="ipsec.html#traffic.resist">discussion</a>. 
+<p>
+The IPSEC protocols provide two ways to do build such tunnels:
+<dl>
+<dt>using ESP with null encryption
+<dd>not supported by FreeS/WAN
+
+<dt>using <a href="glossary.html#AH">AH</a> without <a href="glossary.html#ESP">ESP</a>
+<dd>supported for manually keyed connections
+<dd>possible with explicit commands via <a href="manpage.d/ipsec_whack.8.html">ipsec_whack(8)</a>
+(see this <a href="http://www.sandelman.ottawa.on.ca/linux-ipsec/html/2001/02/msg00190.html">list message</a>)
+<dd>not supported in the
+<a href="manpage.d/ipsec_auto.8.html">ipsec_auto(8)</a> scripts.
+</dl>
+One situation in which this comes up is when otherwise some data would be
+encrypted twice. Alice wants a secure tunnel from her machine to Bob's.
+Since she's behind one security gateway and he's behind another, part of the
+tunnel that they build passes through the tunnel that their site admins have
+built between the gateways. All of Alice and Bob's messages are encrypted
+twice.</p>
+
+<p>
+There are several ways to handle this.</p>
+  <ul>
+    <li>Just accept the overhead of double encryption. The site admins might
+      choose this if any of the following apply:
+    <ul>
+	<li>policy says encrypt everything (usually, it should)
+	<li>they don't entirely trust Alice and Bob (usually, if they don't have to, they
+       shouldn't)
+	<li>if they don't feel the saved cycles are worth the time they'd need to
+      build a non-encrypted tunnel for Alice and Bob's packets (often, they aren't)
+    </ul>
+    <li>Use a plain IP-in-IP tunnel. These are not well documented. A good
+      starting point is in the Linux kernel source tree, in
+      /usr/src/linux/drivers/net/README.tunnel.</li>
+    <li>Use a manually-keyed AH-only tunnel.</li>
+  </ul>
+<p>
+Note that if Alice and Bob want end-to-end security, they must build a tunnel
+end-to-end between their machines or use some other end-to-end tool such as
+PGP or SSL that suits their data. The only question is whether the admins
+build some special unencrypted tunnel for those already-encrypted packets.
+ 
+
+
+
+
+</body>
+</html>
+

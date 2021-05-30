@@ -1,0 +1,47 @@
+This is release 1.91 of Linux FreeS/WAN, our freely-redistributable IPsec
+implementation.  See http://www.freeswan.org for current news and pointers
+to more recent releases (if any).  The BUGS file lists bugs that we
+consider major, and the CHANGES file lists the major things that have been
+done since last time; READ BOTH before installing. 
+
+The current development and target system for FreeS/WAN is Red Hat 6.2
+with a 2.2.19 kernel, although we're in the process of moving to RH7.1
+with 2.4.5; there is increasingly-limited support for RH5.2 with 2.0.39. 
+We advise against use of older kernels.  It's likely to work with other
+Linux distributions using 2.2.x or 2.4.x kernels; if modifications are
+necessary, please tell us details, and we'll try to fix it so it'll drop
+in cleanly in future.  Red Hat 7.0 badly messed up its compilers; this has
+been fixed for 7.1.  Other systems are a lower priority but we'd still
+like to hear details if you try it. 
+
+Several high-level documents are in the doc directory.  Most are in HTML
+format; do
+
+	lynx doc/index.html
+
+(or use your own favorite HTML reader) to read them.  See doc/README for
+two methods of getting plain-text versions if needed.  See doc/roadmap.html
+for a guide to what's where in this distribution. 
+
+Unpacking the distribution needs about 10MB, and compiling it maybe
+another 10MB.  For setup procedures, start at doc/intro.html; the INSTALL
+file is now intended for experts only. 
+
+Feedback is welcome, preferably (for legal reasons, among others) to the
+users mailing list (see http://www.freeswan.org/mail.html to subscribe).
+(Caution:  that mailing list goes all over the world.  If you are located
+in the US, or are a US citizen, read doc/politics.html before sending
+mail!)  If you're reporting a problem with the software, we ask that you
+read doc/prob.report first. 
+
+The bulk of this software is under the GNU General Public License; see
+COPYING.  Some parts of it are not; see CREDITS for the details.
+
+					Henry Spencer (technical lead)
+					Richard Guy Briggs (Klips)
+					D. Hugh Redelmeier (Pluto)
+					Sandy Harris (documentation)
+					Claudia Schmeing (user support)
+
+P.S. This file is RCSID $Id: README,v 1.74 2001/05/30 12:57:43 henry Exp $.
+Bet you were just dying to know that.

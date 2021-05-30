@@ -1,0 +1,2514 @@
+<html lang="en"><head>
+<title>Dmalloc Tutorial</title>
+<meta http-equiv="Content-Type" content="text/html">
+<meta name=description content="Dmalloc Tutorial">
+<meta name=generator content="makeinfo 4.0">
+<link href="http://texinfo.org/" rel=generator-home>
+</head><body>
+
+<p><hr>
+Node:<a name="Top">Top</a>,
+Next:<a rel=next href="#Copying">Copying</a>,
+Previous:<a rel=previous href="#(dir)">(dir)</a>,
+Up:<a rel=up href="#(dir)">(dir)</a>
+<br>
+
+<h1>Debug Malloc Library</h1>
+
+<p>The debug memory allocation or <dfn>dmalloc</dfn> library has been designed
+as a drop in replacement for the system's <code>malloc</code>, <code>realloc</code>,
+<code>calloc</code>, <code>free</code> and other memory management routines while
+providing powerful debugging facilities configurable at runtime.  These
+facilities include such things as memory-leak tracking, fence-post write
+detection, file/line number reporting, and general logging of
+statistics.
+
+<p>The library is reasonably portable having been run successfully on at
+least the following operating systems: AIX, BSD/OS, DG/UX, FreeBSD,
+HPUX, Irix, Linux, MS-DOG, NeXT, OSF, SCO, Solaris, SunOS, Ultrix,
+Unixware, Windoze and even Unicos on a Cray Y-MP.  It also provides
+support for the debugging of threaded programs.  See <a href="#Using%20With%20Threads">Using With Threads</a>.
+
+<p>The package includes the library, configuration scripts, debug utility
+application, test program, and documentation.  Online documentation as
+well as the full source is available at URL <a href="http://dmalloc.com/">http://dmalloc.com/</a>. 
+Details on the library's mailing list are available there as well.
+
+<p>My contact information is available on the web page.  I can be reached
+with any questions or feedback.  Please include the version number of
+the library that you are using as well as your machine and operating
+system types.
+
+<p>Gray Watson.
+
+<ul>
+<li><a href="#Copying">Copying</a>:                      Library copying and licensing conditions. 
+<li><a href="#Overview">Overview</a>:                     Description of features and how to get started. 
+<li><a href="#Programming">Programming</a>:                  How to program with the library. 
+<li><a href="#Dmalloc%20Program">Dmalloc Program</a>:              Dmalloc Utility Program. 
+<li><a href="#Source%20Code">Source Code</a>:                  Information on the source code. 
+<li><a href="#Index%20of%20Concepts">Index of Concepts</a>:            Index of concepts in the manual. 
+</ul>
+
+<p><hr>
+Node:<a name="Copying">Copying</a>,
+Next:<a rel=next href="#Overview">Overview</a>,
+Previous:<a rel=previous href="#Top">Top</a>,
+Up:<a rel=up href="#Top">Top</a>
+<br>
+
+<h1>1 Library Copying and Licensing Conditions</h1>
+
+<p>Copyright 1992 to 2000 by Gray Watson.
+
+<p>Permission to use, copy, modify, and distribute this software for any
+purpose and without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies, and
+that the name of Gray Watson not be used in advertising or publicity
+pertaining to distribution of the document or software without specific,
+written prior permission.
+
+<p>Gray Watson makes no representations about the suitability of the
+software described herein for any purpose.  It is provided "as is"
+without express or implied warranty.
+
+<p><hr>
+Node:<a name="Overview">Overview</a>,
+Next:<a rel=next href="#Programming">Programming</a>,
+Previous:<a rel=previous href="#Copying">Copying</a>,
+Up:<a rel=up href="#Top">Top</a>
+<br>
+
+<h1>2 Description of Features and How to Get Started</h1>
+
+<ul>
+<li><a href="#Allocation%20Basics">Allocation Basics</a>:            Basic description of terms and functions. 
+<li><a href="#Features">Features</a>:                     General features of the library. 
+<li><a href="#Installation">Installation</a>:                 How to install the library. 
+<li><a href="#Getting%20Started">Getting Started</a>:              Getting started with the library. 
+<li><a href="#Troubleshooting">Troubleshooting</a>:              Some solutions to common problems. 
+</ul>
+
+<p><hr>
+Node:<a name="Allocation%20Basics">Allocation Basics</a>,
+Next:<a rel=next href="#Features">Features</a>,
+Previous:<a rel=previous href="#Overview">Overview</a>,
+Up:<a rel=up href="#Overview">Overview</a>
+<br>
+
+<h2>2.1 Basic Description of Terms and Functions</h2>
+
+<ul>
+<li><a href="#Basic%20Definitions">Basic Definitions</a>:            General memory terms and concepts. 
+<li><a href="#Malloc%20Functions">Malloc Functions</a>:             Functionality supported by all malloc libs. 
+</ul>
+
+<p><hr>
+Node:<a name="Basic%20Definitions">Basic Definitions</a>,
+Next:<a rel=next href="#Malloc%20Functions">Malloc Functions</a>,
+Previous:<a rel=previous href="#Allocation%20Basics">Allocation Basics</a>,
+Up:<a rel=up href="#Allocation%20Basics">Allocation Basics</a>
+<br>
+
+<h3>2.1.1 General Memory Terms and Concepts</h3>
+
+<p>Any program can be divided into 2 logical parts: text and data.  Text is
+the actual program code in machine-readable format and data is the
+information that the text operates on when it is executing.  The data,
+in turn, can be divided into 3 logical parts according to where it is
+stored: <dfn>static</dfn>, <dfn>stack</dfn>, and <dfn>heap</dfn>.
+
+<p>Static data is the information whose storage space is compiled into the
+program.
+
+<pre>/* global variables are allocated as static data */
+int numbers[10];
+
+main()
+{
+        <small>...</small>
+}
+</pre>
+
+<p>Stack data is data allocated at runtime to hold information used inside
+of functions.  This data is managed by the system in the space called
+stack space.
+
+<pre>void foo()
+{
+        /* this local variable is stored on the stack */
+        float total;
+        <small>...</small>
+}
+
+main()
+{
+        foo();
+}
+</pre>
+
+<p>Heap data is also allocated at runtime and provides a programmer with
+dynamic memory capabilities.
+
+<pre>main()
+{
+        /* the address is stored on the stack */
+        char * string;
+        <small>...</small>
+
+        /*
+         * Allocate a string of 10 bytes on the heap.  Store the
+         * address in string which is on the stack.
+         */
+        string = (char *)malloc(10);
+        <small>...</small>
+
+        /* de-allocate the heap memory now that we're done with it */
+        (void)free(string);
+        <small>...</small>
+}
+</pre>
+
+<p>It is the heap data that is managed by this library.
+
+<p>Although the above is an example of how to use the malloc and free
+commands, it is not a good example of why using the heap for runtime
+storage is useful.
+
+<p>Consider this: You write a program that reads a file into memory,
+processes it, and displays results.  You would like to handle files with
+arbitrary size (from 10 bytes to 1.2 megabytes and more).  One problem,
+however, is that the entire file must be in memory at one time to do the
+calculations.  You don't want to have to allocate 1.2 megabytes when you
+might only be reading in a 10 byte file because it is wasteful of system
+resources.  Also, you are worried that your program might have to handle
+files of more than 1.2 megabytes.
+
+<p>A solution: first checkout the file's size and then, using the
+heap-allocation routines, get enough storage to read the entire file
+into memory.  The program will only be using the system resources
+necessary for the job and you will be guaranteed that your program can
+handle any sized file.
+
+<p><hr>
+Node:<a name="Malloc%20Functions">Malloc Functions</a>,
+Previous:<a rel=previous href="#Basic%20Definitions">Basic Definitions</a>,
+Up:<a rel=up href="#Allocation%20Basics">Allocation Basics</a>
+<br>
+
+<h3>2.1.2 Functionality Supported by All Malloc Libraries</h3>
+
+<p>All malloc libraries support 4 basic memory allocation commands.  These
+include <dfn>malloc</dfn>, <dfn>calloc</dfn>, <dfn>realloc</dfn>, and <dfn>free</dfn>.  For
+more information about their capabilities, check your system's manual
+pages - in unix, do a <code>man 3 malloc</code>.
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void *malloc ( unsigned int <var>size</var> )
+
+<p>Usage: <code>pnt = (type *)malloc(size)</code>
+
+<p>The malloc routine is the basic memory allocation routine.  It allocates
+an area of <code>size</code> bytes.  It will return a pointer to the space
+requested.
+
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void *calloc ( unsigned int <var>number</var>, unsigned int
+<var>size</var> )
+
+<p>Usage: <code>pnt = (type *)calloc(number, size)</code>
+
+<p>The calloc routine allocates a certain <code>number</code> of items, each of
+<code>size</code> bytes, and returns a pointer to the space.  It is
+appropriate to pass in a <code>sizeof(type)</code> value as the size argument.
+
+<p>Also, calloc nulls the space that it returns, assuring that the memory
+is all zeros.
+
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void *realloc ( void *<var>old_pnt</var>, unsigned int
+<var>new_size</var> )
+
+<p>Usage: <code>new_pnt = (type *)realloc(old_pnt, new_size)</code>
+
+<p>The realloc function expands or shrinks the memory allocation in
+<code>old_pnt</code> to <code>new_size</code> number of bytes.  Realloc copies as
+much of the information from <code>old_pnt</code> as it can into the
+<code>new_pnt</code> space it returns, up to <code>new_size</code> bytes.  If there
+is a problem allocating this memory, 0L will be returned.
+
+<p>If the <code>old_pnt</code> is 0L then realloc will do the equivalent of a
+<code>malloc(new_size)</code>.  If <code>new_size</code> is 0 and <code>old_pnt</code> is
+not 0L, then it will do the equivalent of <code>free(old_pnt)</code> and will
+return 0L.
+
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void free ( void *<var>pnt</var> )
+
+<p>Usage: <code>free(pnt)</code>
+
+<p>The free routine releases allocation in <code>pnt</code> which was returned by
+malloc, calloc, or realloc back to the heap.  This allows other parts of
+the program to re-use memory that is not needed anymore.  It guarantees
+that the process does not grow too big and swallow a large portion of
+the system resources.
+
+</TD></TR>
+</TABLE>
+
+<p><em>NOTE</em>: the returned address from the memory
+allocation/reallocation functions should be cast to the appropriate
+pointer type for the variable being assigned.  Also this may no longer
+be necessary on your system, it can still provide some documentation
+value to the code.
+
+<p><em>WARNING</em>: there is a quite common myth that all of the space that
+is returned by malloc libraries has already been cleared.  <em>Only</em>
+the <code>calloc</code> routine will zero the memory space it returns.
+
+<p><hr>
+Node:<a name="Features">Features</a>,
+Next:<a rel=next href="#Installation">Installation</a>,
+Previous:<a rel=previous href="#Allocation%20Basics">Allocation Basics</a>,
+Up:<a rel=up href="#Overview">Overview</a>
+<br>
+
+<h2>2.2 General Features of the Library</h2>
+
+<p>The debugging features that are available in this debug malloc library
+can be divided into a couple basic classifications:
+
+<dl>
+<dt>file and line number information
+<dd>One of the nice things about a good debugger is its ability to provide
+the file and line number of an offending piece of code.  This library
+attempts to give this functionality with the help of <dfn>cpp</dfn>, the C
+preprocessor.  See <a href="#Allocation%20Macros">Allocation Macros</a>.
+
+<br><dt>return-address information
+<dd>To debug calls to the library from external sources (i.e. those files
+that could not use the allocation macros), some facilities have been
+provided to supply the caller's address.  This address, with the help of
+a debugger, can help you locate the source of a problem.  See <a href="#Return%20Address">Return Address</a>.
+
+<br><dt>fence-post (i.e. bounds) checking
+<dd><dfn>Fence-post</dfn> memory is the area immediately above or below memory
+allocations.  It is all too easy to write code that accesses above or
+below an allocation - especially when dealing with arrays or strings. 
+The library can write special values in the areas around every
+allocation so it will notice when these areas have been overwritten. 
+See <a href="#Fence-Post%20Overruns">Fence-Post Overruns</a>.
+
+<p><em>NOTE</em>: The library cannot notice when the program <em>reads</em>
+from these areas, only when it writes values.  Also, fence-post checking
+will increase the amount of memory the program allocates.
+
+<br><dt>heap-constancy verification
+<dd>The administration of the library is reasonably complex.  If any of the
+heap-maintenance information is corrupted, the program will either crash
+or give unpredictable results.
+
+<p>By enabling heap-consistency checking, the library will run through its
+administrative structures to make sure all is in order.  This will mean
+that problems will be caught faster and diagnosed better.
+
+<p>The drawback of this is, of course, that the library often takes quite a
+long time to do this.  It is suitable to enable this only during
+development and debugging sessions.
+
+<p><em>NOTE</em>: the heap checking routines cannot guarantee that the tests
+will not cause a segmentation-fault if the heap administration
+structures are properly (or improperly if you will) overwritten.  In
+other words, the tests will verify that everything is okay but may not
+inform the user of problems in a graceful manner.
+
+<br><dt>logging statistics
+<dd>One of the reasons why the debug malloc library was initially developed
+was to track programs' memory usage - specifically to locate
+<dfn>memory leaks</dfn> which are places where allocated memory is never
+getting freed.  See <a href="#Memory%20Leaks">Memory Leaks</a>.
+
+<p>The library has a number of logging capabilities that can track un-freed
+memory pointers as well as runtime memory usage, memory transactions,
+administrative actions, and final statistics.
+
+<br><dt>examining unfreed memory
+<dd>Another common problem happens when a program frees a memory pointer but
+goes on to use it again by mistake.  This can lead to mysterious crashes
+and unexplained problems.
+
+<p>To combat this, the library can write special values into a block of
+memory after it has been freed.  This serves two purposes: it will make
+sure that the program will get garbage data if it trying to access the
+area again, and it will allow the library to verify the area later for
+signs of overwriting. 
+</dl>
+
+<p>If any of the above debugging features detect an error, the library will
+try to recover.  If logging is enabled then an error will be logged with
+as much information as possible.
+
+<p>The error messages that the library displays are designed to give the
+most information for developers.  If the error message is not
+understood, then it is most likely just trying to indicate that a part
+of the heap has been corrupted.
+
+<p>The library can be configured to quit immediately when an error is
+detected and to dump a core file or memory-image.  This can be examined
+with a debugger to determine the source of the problem.  The library can
+either stop after dumping core or continue running.
+
+<p><em>NOTE</em>: do not be surprised if the library catches problems with
+your system's routines.  It took me hours to finally come to the
+conclusion that the localtime call, included in SunOS release 4.1,
+overwrites one of its fence-post markers.
+
+<p><hr>
+Node:<a name="Installation">Installation</a>,
+Next:<a rel=next href="#Getting%20Started">Getting Started</a>,
+Previous:<a rel=previous href="#Features">Features</a>,
+Up:<a rel=up href="#Overview">Overview</a>
+<br>
+
+<h2>2.3 How to Install the Library</h2>
+
+<p>To configure, compile, and install the library, follow these steps
+carefully.
+
+<ol type=1 start=1>
+
+</p><li>Make sure you have the latest version of the library available
+from the home page <a href="http://dmalloc.com/">http://dmalloc.com/</a>.
+
+<li>You probably will want to edit the settings in
+<code>settings.dist</code> to tune specific features of the library.  The
+<code>configure</code> script will copy this file to <code>settings.h</code>
+which is where you should be adding per-architecture settings.
+
+<li>Type <kbd>sh ./configure</kbd> to configure the library.  You may want
+to first examine the <code>config.help</code> file for some information about
+configure.  You may want to use the <kbd>--disable-cxx</kbd> option if you do
+not want the Makefile to build the C++ version of dmalloc.  You may also
+want to use the <kbd>--enable-threads</kbd> option to build the threaded
+version of dmalloc.  Configure should generate the <code>Makefile</code> and
+configuration files automatically.
+
+<p><em>NOTE</em>: It seems that some versions of tr (especially from HP-UX)
+don't understand <code>tr '[a-z]' '[A-Z]'</code>.  Since configure uses tr
+often, you may need to either get GNU's tr (in their textutils package)
+or generate the <code>Makefile</code> and <code>conf.h</code> files by hand.
+
+<li>You may want to examine the <code>Makefile</code> and <code>conf.h</code> files
+created by configure to make sure it did its job correctly.
+
+<li>You might want to tune the settings in <code>settings.h</code> file to
+tune the library to the local architecture.  This file contains relevant
+settings if you are using pthreads or another thread library. 
+See <a href="#Using%20With%20Threads">Using With Threads</a>.  The <code>configure</code> script created this
+file from the <code>settings.dist</code> file.  Any permanent changes to these
+settings should made to the <code>settings.dist</code> file.  You then can run
+<code>config.status</code> to re-create the <code>settings.h</code> file.
+
+<li>The <code>DMALLOC_SIZE</code> variable gets auto-configured in
+<code>dmalloc.h.2</code> but it may not generate correct settings for all
+systems.  You may have to alter the definitions in this file to get
+things to stop complaining when you go to compile about the size
+arguments to malloc routines.  Comments on this please.
+
+<li>Typing <kbd>make</kbd> should be enough to build <code>libdmalloc.a</code>,
+<code>libdmalloclp.a</code>, and <code>dmalloc</code> program.  If it does not work,
+please see if there are any notes in the contrib directory about your
+system-type.  If not and you figure your problem out, please send me
+some notes so future users can profit from your experiences.
+
+<p><em>NOTE</em>: You may experience some errors compiling some of the
+return.h assembly macros which attempt to determine the callers address
+for logging purposes.  You may want to first try disabling any compiler
+optimization flags.  If this doesn't work then you may need to disable
+the <code>USE_RETURN_MACROS</code> variable in the <code>settings.h</code> file.
+
+<p><em>NOTE</em>: The code is dependent on an ANSI-C compiler.  If the
+configure script gives the <code>WARNING</code> that you do not have an ANSI-C
+compiler, you may still be able to add some sort of option to your
+compiler to make it ANSI.  If there such is an option, please send it to
+the author so it can be added to the configure script.
+
+<li>If you use threads, typing <kbd>make threads</kbd> should be enough
+to build <code>libdmallocth.a</code> which is the threaded version of the
+library.  This may or may not work depending on the configuration
+scripts ability to detect your local thread functionality.  Feel free to
+send me mail with improvements.
+
+<p>See the "Using With Threads" section for more information about the
+operation of the library with your threaded program.  See <a href="#Using%20With%20Threads">Using With Threads</a>.
+
+</p><li>If you have a C++ compiler installed, the library should have
+automatically built <code>libdmallocxx.a</code> which is the C++ version of
+the library.  If it was not done automatically, you can build it by
+typing <kbd>make cxx</kbd>.  You should link this library into your C++
+programs instead of <code>libdmalloc.a</code>.  See the <code>dmallocc.cc</code> C++
+file which contains basic code to overload the <code>new</code>, <code>new[]</code>,
+<code>delete</code>, and <code>delete[]</code> C++ operators.  My apologies on the
+minimal C++ support.  I am still living in a mostly C world.  Any help
+improving this interface without sacrificing portability would be
+appreciated.
+
+<li>Typing <kbd>make tests</kbd> should build the <code>dmalloc_t</code> test
+program.
+
+<li>Typing <kbd>make light</kbd> should run the <code>dmalloc_t</code> test
+program through a set of light trials.  By default this will execute
+<code>dmalloc_t</code> 5 times - each time will execute 10,000 malloc
+operations in a very random manner.  Anal folks can type <kbd>make
+heavy</kbd> to up the ante.  Use <kbd>dmalloc_t --usage</kbd> for the list of all
+<code>dmalloc_t</code> options.
+
+<li>Typing <kbd>make install</kbd> should install the <code>libdmalloc.a</code>
+and <code>libdmalloc_lp.a</code> library files in <code>/usr/local/lib</code>, the
+<code>dmalloc.h</code> include file in <code>/usr/local/include</code>, and the
+<code>dmalloc</code> utility in <code>/usr/local/bin</code>.  You may also want to
+type <kbd>make installth</kbd> to install the thread library into place
+and/or <kbd>make installcc</kbd> to install the C++ library into place.
+
+<p>You may have specified a <code>--prefix=PATH</code> option to configure in
+which case <code>/usr/local</code> will have been replaced with <code>PATH</code>.
+
+</ol>
+
+<p>See the "Getting Started" section to get up and running with the
+library.  See <a href="#Getting%20Started">Getting Started</a>.
+
+<p><hr>
+Node:<a name="Getting%20Started">Getting Started</a>,
+Next:<a rel=next href="#Troubleshooting">Troubleshooting</a>,
+Previous:<a rel=previous href="#Installation">Installation</a>,
+Up:<a rel=up href="#Overview">Overview</a>
+<br>
+
+<h2>2.4 Getting Started with the Library</h2>
+
+<p>This section should give you a quick idea on how to get going. 
+Basically, you need to do the following things to make use of the
+library:
+
+<ol type=1 start=1>
+
+</p><li>Make sure you have the latest version of the library available
+from the home page <a href="http://dmalloc.com/">http://dmalloc.com/</a>.
+
+<li>Follow the installation instructions on how to configure and
+make and install the library (i.e. type: <kbd>make install</kbd>). 
+See <a href="#Installation">Installation</a>.
+
+<li>You need to make sure that the dmalloc building process
+above was able to locate one of the the <code>on_exit</code> or <code>atexit</code>
+functions.  If so, then the dmalloc library should be able to
+automatically call <code>dmalloc_shutdown</code> when <code>exit</code> is called. 
+This causes the memory statistics and unfreed information to be dumped
+to the log file.  However, if your system has neither, you will need to
+call <code>dmalloc_shutdown</code> yourself before your program exits.
+
+<li>Add an alias for dmalloc to your shell's rc file if supported. 
+Bash, ksh, and zsh users should add the following to their
+<code>.bashrc</code>, <code>.profile</code>, or <code>.zshrc</code> file respectively
+(notice the <kbd>-b</kbd> option for bourne shell output):
+
+<pre>function dmalloc { eval `command dmalloc -b $*`; }
+</pre>
+
+<p>By the way, if you are looking for a shell, I heartily recommend trying
+out zsh.  It is a bourne shell written from scratch with much the same
+features as tcsh without the csh crap.  If you are <em>still</em> using
+csh or tcsh, you should add the following to your <code>.cshrc</code> file
+(notice the <kbd>-C</kbd> option for c-shell output):
+
+<pre>alias dmalloc 'eval `\dmalloc -C \!*`'
+</pre>
+
+</p><li>Although not necessary, you may want to include <code>dmalloc.h</code>
+in your C files and recompile.  This will allow the library to report
+the file/line numbers of calls that generate problems.  See <a href="#Allocation%20Macros">Allocation Macros</a>.  It should be inserted at the <em>bottom</em> of your include
+files as to not conflict with other includes.  You may want to ifdef it
+as well and compile with <kbd>cc -DDMALLOC <small>...</small></kbd>:
+
+<pre>/* other includes above ^^^ */
+
+#ifdef DMALLOC
+#include "dmalloc.h"
+#endif
+</pre>
+
+<li>Link the dmalloc library into your program.
+
+<li>Enable the debugging features by typing <kbd>dmalloc -l logfile
+-i 100 low</kbd> (for example).  This will:
+
+<ul>
+
+<li>set the malloc log path to <code>logfile</code> (<kbd>-l logfile</kbd>)
+
+<li>have the library check itself every 100 iterations (<kbd>-i 100</kbd>)
+
+<li>enable a number of debug features (<kbd>low</kbd>).  You can
+also try <kbd>runtime</kbd> for minimal checking or <kbd>medium</kbd> or
+<kbd>high</kbd> for more extensive heap verification.  <kbd>all</kbd> is also
+provided but generates a multitude of log messages without many more
+tests.
+
+</ul>
+
+<p><kbd>dmalloc --usage</kbd> will provide verbose usage info for the dmalloc
+program.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<p>You may also want to install the <code>dmallocrc</code> file in your home
+directory as <code>.dmallocrc</code>.  This allows you to add your own
+combination of debug tokens.  See <a href="#RC%20File">RC File</a>.
+
+</p><li>You may also want to enable the <code>log-unknown</code> token
+(<kbd>dmalloc -p log-unknown</kbd>) which will log non-freed information
+about "unknown" memory to the log file.  Unknown means memory that
+does not have associated file and line information.  This is necessary
+if you are <em>not</em> including <code>dmalloc.h</code> in your C files or if
+you want to track possible memory leaks in system functions.
+
+<li>Run your program, examine the logfile that should have been created by
+dmalloc_shutdown, and use its information to help debug your program. 
+See the next section for help with this.  See <a href="#Troubleshooting">Troubleshooting</a>.
+
+</ol>
+
+<p><hr>
+Node:<a name="Troubleshooting">Troubleshooting</a>,
+Previous:<a rel=previous href="#Getting%20Started">Getting Started</a>,
+Up:<a rel=up href="#Overview">Overview</a>
+<br>
+
+<h2>2.5 Some Solutions to Common Problems</h2>
+
+<p>This section provides some answers to some common problems and
+questions.  Please feel free to send me mail with any additions to this
+list - either problems you are still having or tips that you would like
+to pass on.
+
+<dl>
+
+<br><dt><code>Why does my program run so slow?</code>
+<dd>
+This library has never been (and maybe never will be) optimized for
+space nor speed.  Some of its features make it unable to use some of the
+organizational methods of other more efficient heap libraries.  If you
+have the <code>check-heap</code> token enabled, see the <kbd>-i</kbd> option to the
+dmalloc utility.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<br><dt><code>Why was a log-file not produced after I ran my program?</code>
+<dd>
+This could be caused by a number of different problems.
+
+<ol type=1 start=1>
+
+</p><li>Are you sure you followed all of the items in the "Getting Started"
+section?  Please review them if there is any doubt.  See <a href="#Getting%20Started">Getting Started</a>.
+
+<li>Use the <kbd>env</kbd> or <kbd>printenv</kbd> commands to make sure that
+the <code>DMALLOC_OPTIONS</code> variable is set in your exported environment. 
+See <a href="#Environment%20Variable">Environment Variable</a>.
+
+<li>Make sure that your program has been compiled correctly with the
+dmalloc library.  The <kbd>ident</kbd> program should show chunk.c and other
+dmalloc files compiled into your program.  You can also do <kbd>strings
+-a your-program | grep chunk.c</kbd> and look for something like <code>$Id:
+chunk.c,v 1.152 1999/08/25 12:37:01 gray Exp $</code> with different versions
+and date information.  If this doesn't show up then chances are dmalloc
+was not linked into your program.
+
+<li>If your program changes its working directory, it may write the
+dmalloc log-file somewhere else in the filesystem.  You will need to
+check both where the program was started and to where it might change
+directory.
+
+</ol>
+
+<br><dt><code>I don't see any information about my non-freed (leaked) memory?</code>
+<dd>
+The library will not (by default) report on "unknown" non-freed
+memory.  Unknown means memory that does not have associated file and
+line information.  To log information about unknown pointers you should
+enable the <code>log-unknown</code> token (<kbd>dmalloc -p log-unknown</kbd>). 
+This will be necessary if you are <em>not</em> including <code>dmalloc.h</code>
+in all of your C files or if you are interested in tracking leaks in
+system functions.
+
+</dl>
+
+<p><hr>
+Node:<a name="Programming">Programming</a>,
+Next:<a rel=next href="#Dmalloc%20Program">Dmalloc Program</a>,
+Previous:<a rel=previous href="#Overview">Overview</a>,
+Up:<a rel=up href="#Top">Top</a>
+<br>
+
+<h1>3 How to Program with the Library</h1>
+
+<ul>
+<li><a href="#Allocation%20Macros">Allocation Macros</a>:            Macros providing file and line information. 
+<li><a href="#Return%20Address">Return Address</a>:               Getting caller address information. 
+<li><a href="#Argument%20Checking">Argument Checking</a>:            Checking of function arguments. 
+<li><a href="#Extensions">Extensions</a>:                   Additional non-standard routines. 
+<li><a href="#C++%20and%20the%20Library">C++ and the Library</a>:          Using the library with C++. 
+<li><a href="#Disabling%20the%20Library">Disabling the Library</a>:        How to disable the library. 
+<li><a href="#Using%20With%20a%20Debugger">Using With a Debugger</a>:        Using a debugger with the library. 
+<li><a href="#Using%20With%20Threads">Using With Threads</a>:           Using the library with a thread package. 
+</ul>
+
+<p><hr>
+Node:<a name="Allocation%20Macros">Allocation Macros</a>,
+Next:<a rel=next href="#Return%20Address">Return Address</a>,
+Previous:<a rel=previous href="#Programming">Programming</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.1 Macros Providing File and Line Information</h2>
+
+<p>By including <code>dmalloc.h</code> in your C files, your calls to malloc,
+calloc, realloc, recalloc, memalign, valloc, strdup, and free are
+replaced with calls to _malloc_leap, _calloc_leap, _realloc_leap,
+_recalloc_leap, _memalign_leap, _valloc_leap, _strdup_leap, and
+_free_leap.  Additionally the library replaces calls to xmalloc,
+xcalloc, xrealloc, xrecalloc, xmemalign, xvalloc, xstrdup, and xfree
+with associated _leap calls.
+
+<p>These <dfn>leap macros</dfn> use the c-preprocessor <code>__FILE__</code> and
+<code>__LINE__</code> macros which get replaced at compilation time with the
+current file and line-number of the source code in question.  The leap
+routines take this information and pass it on to the library making it
+able to produce verbose reports on memory problems.
+
+<pre>not freed: '0x38410' (22 bytes) from 'dmalloc_t.c:92'
+</pre>
+
+<p>This line from a log file shows that memory was not freed from file
+<code>dmalloc_t.c</code> line 92.  See <a href="#Memory%20Leaks">Memory Leaks</a>.
+
+<p>You may notice some non standard memory allocation functions in the
+above leap list.  Recalloc is a routine like realloc that reallocates
+previously allocated memory to a new size.  If the new memory size is
+larger than the old, recalloc initializes the new space to all zeros. 
+This may or may not be supported natively by your operating system. 
+Memalign is like malloc but should insure that the returned pointer is
+aligned to a certain number of specified bytes.  Currently, the memalign
+function is not supported by the library.  It defaults to returning
+possibly non-aligned memory for alignment values less than a block-size. 
+Valloc is like malloc but insures that the returned pointer will be
+aligned to a page boundary.  This may or may not be supported natively
+by your operating system but is fully supported by the library.  Strdup
+is a string duplicating routine which takes in a null terminated string
+pointer and returns an allocated copy of the string that will need to be
+passed to free later to deallocate.
+
+<p>The X versions of the standard memory functions (xmalloc, xfree, etc.) 
+will print out an error message to standard error and will stop if the
+library is unable to allocate any additional memory.  It is useful to
+use these routines instead of checking everywhere in your program for
+allocation routines returning NULL pointers.
+
+<p><em>WARNING</em>: If you are including the <code>dmalloc.h</code> file in your
+sources, it is recommended that it be at the end of your include file
+list because dmalloc uses macros and may try to change declarations of
+the malloc functions if they come after it.
+
+<p><hr>
+Node:<a name="Return%20Address">Return Address</a>,
+Next:<a rel=next href="#Argument%20Checking">Argument Checking</a>,
+Previous:<a rel=previous href="#Allocation%20Macros">Allocation Macros</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.2 Getting Caller Address Information</h2>
+
+<p>Even though the allocation macros can provide file/line information for
+some of your code, there are still modules which either you can't
+include <code>dmalloc.h</code> (such as library routines) or you just don't
+want to.  You can still get information about the routines that call
+dmalloc function from the return-address information.  To accomplish
+this, you must be using this library on one of the supported
+architecture/compilers.  See <a href="#Portability">Portability</a>.
+
+<p>The library attempts to use some assembly hacks to get the the
+return-address or the address of the line that called the dmalloc
+function.  If you have the <code>log-unknown</code> token enabled and you run
+your program, you might see the following non-freed memory messages.
+
+<pre>not freed: '0x38410' (22 bytes) from 'ra=0xdd2c'
+not freed: '0x38600' (10232 bytes) from 'ra=0x10234d'
+not freed: '0x38220' (137 bytes) from 'ra=0x82cc'
+</pre>
+
+<p>With the help of a debugger, these return-addresses (or ra) can then be
+identified.  I've provided a <code>ra_info.pl</code> perl script in the
+<code>contrib/</code> directory with the dmalloc sources which seems to work
+well with gdb.  You can also use the manual methods below for gdb.
+
+<pre>(gdb) x 0x10234d
+0x10234d &lt;_findbuf+132&gt;: 0x7fffceb7
+
+(gdb) info line *(0x82cc)
+Line 1092 of argv.c starts at pc 0x7540 and ends at 0x7550.
+</pre>
+
+<p>In the above example, gdb was used to find that the two non-freed memory
+pointers were allocated in <code>_findbuf()</code> and in file argv.c line
+1092 respectively.  The <code>x address</code> (for examine) can always be
+used on the return-addresses but the <code>info line *(address)</code> will
+only work if that file was compiled using the <kbd>-g</kbd> option and has
+not been stripped.  This limitation may not be true in later versions of
+gdb.
+
+<p><hr>
+Node:<a name="Argument%20Checking">Argument Checking</a>,
+Next:<a rel=next href="#Extensions">Extensions</a>,
+Previous:<a rel=previous href="#Return%20Address">Return Address</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.3 Checking of Function Arguments</h2>
+
+<p>One potential problem with the library and its multitude of checks and
+diagnoses is that they only get performed when a dmalloc function is
+called.  One solution this is to include <code>dmalloc.h</code> and compile
+your source code with the <code>DMALLOC_FUNC_CHECK</code> flag defined and
+enable the <code>check-funcs</code> token.  See <a href="#Debug%20Tokens">Debug Tokens</a>.
+
+<pre>cc -DDMALLOC_FUNC_CHECK file.c
+</pre>
+
+<p><em>NOTE</em>: Once you have compiled your source with DMALLOC_FUNC_CHECK
+enabled, you will have to recompile with it off to disconnect the
+library.  See <a href="#Disabling%20the%20Library">Disabling the Library</a>.
+
+<p><em>WARNING</em>: You should be sure to have <code>dmalloc.h</code> included at
+the end of your include file list because dmalloc uses macros and may
+try to change declarations of the checked functions if they come after
+it.
+
+<p>When this is defined dmalloc will override a number of functions and
+will insert a routine which knows how to check its own arguments and
+then call the real function.  Dmalloc can check such functions as
+<code>bcopy</code>, <code>index</code>, <code>strcat</code>, and <code>strcasecmp</code>.  For
+the full list see the end of <code>dmalloc.h</code>.
+
+<p>When you call <code>strlen</code>, for instance, dmalloc will make sure the
+string argument's fence-post areas have not been overwritten, its file
+and line number locations are good, etc.  With <code>bcopy</code>, dmalloc
+will make sure that the destination string has enough space to store the
+number of bytes specified.
+
+<p>For all of the arguments checked, if the pointer is not in the heap then
+it is ignored since dmalloc does not know anything about it.
+
+<p><hr>
+Node:<a name="Extensions">Extensions</a>,
+Next:<a rel=next href="#C++%20and%20the%20Library">C++ and the Library</a>,
+Previous:<a rel=previous href="#Argument%20Checking">Argument Checking</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.4 Additional Non-standard Routines</h2>
+
+<p>The library has a number of variables that are not a standard part of
+most malloc libraries:
+
+<dl>
+<dt><code>char * dmalloc_logpath</code>
+<dd>This variable can be used to set the dmalloc log filename.  The env
+variable DMALLOC_LOGFILE overrides this variable.
+
+<br><dt><code>int dmalloc_errno</code>
+<dd>This variable stores the internal dmalloc library error number like errno
+does for the system calls.  It can be passed to <code>dmalloc_strerror()</code>
+(see below) to get a string version of the error.  It will have a value
+of zero if the library has not detected any problems.
+
+<br><dt><code>int dmalloc_address</code>
+<dd>This variable holds the address to be specifically looked for when
+allocating or freeing by the library.
+
+<br><dt><code>int dmalloc_address_count</code>
+<dd>This variable stores the argument to the address library setting.  If it
+is set to a greater than 0 value then after the library has seen the
+<code>addr</code> address this many times, it will call
+<code>dmalloc_error()</code>.
+
+<p>This works well in conjunction with the <code>STORE_SEEN_COUNT</code> option. 
+See <a href="#Memory%20Leaks">Memory Leaks</a>.
+
+</dl>
+
+<p>Additionally the library provides a number of non-standard malloc
+routines:
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_shutdown ( void )
+
+<p>This function shuts the library down and logs the final statistics and
+information especially the non-freed memory pointers.  The library has
+code to support auto-shutdown if your system has <code>on_exit()</code> or
+<code>atexit()</code> calls (see <code>conf.h</code>).  If you do not have these
+routines, then <code>dmalloc_shutdown</code> should be called right before
+<code>exit()</code> or as the last function in <code>main()</code>.
+
+<pre>main()
+{
+        <small>...</small>
+        dmalloc_shutdown();
+        exit(0);
+}
+</pre>
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_log_heap_map ( void )
+
+<p>This routine logs to the logfile (if it is enabled) a graphical
+representation of the current heap space. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_log_stats ( void )
+
+<p>This routine outputs the current dmalloc statistics to the log file. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_log_unfreed( void )
+
+<p>This function dumps the unfreed-memory information to the log file. 
+This is also useful to dump the currently allocated points to the log
+file to be compared against another dump later on. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+int dmalloc_verify ( char * <var>pnt</var> )
+
+<p>This function verifies individual memory pointers that are suspect of
+memory problems.  To check the entire heap pass in a NULL or 0 pointer. 
+The routine returns DMALLOC_VERIFY_ERROR or DMALLOC_VERIFY_NOERROR.
+
+<p><em>NOTE</em>: <code>dmalloc_verify()</code> can only check the heap with the
+functions that have been enabled.  For example, if fence-post checking
+is not enabled, <code>dmalloc_verify()</code> cannot check the fence-post
+areas in the heap. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_debug ( long <var>debug</var> )
+
+<p>This routine overrides the debug setting from the environment variable
+and sets the library debugging features explicitly.  For instance, if
+debugging should never be enabled for a program, a call to
+<code>dmalloc_debug(0)</code> as the first call in <code>main()</code> will disable
+all the memory debugging from that point on.
+
+<p>One problem however is that some systems make calls to memory allocation
+functions <em>before</em> <code>main()</code> is reached therefore before
+<code>dmalloc_debug()</code> can be called meaning some debugging information
+may be generated regardless. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+long dmalloc_debug_current ( void )
+
+<p>This routine returns the current debug value from the environment
+variable.  This allows you to save a copy of the debug dmalloc settings
+to be changed and then restored later. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+int dmalloc_examine ( char * <var>pnt</var>, int * <var>size</var>,
+char ** <var>file</var>, int * <var>line</var>, void ** <var>ret_address</var> )
+
+<p>This function returns the size of a pointer's allocation as well as the
+file and line or the return-address from where it was allocated.  It
+will return NOERROR or ERROR depending on whether pnt is good or not.
+
+<p><em>NOTE</em>: This function is <em>certainly</em> not provided by most if
+not all other malloc libraries. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_message ( char * <var>format</var>, <var>...</var> )
+
+<p>Write a message into the dmalloc logfile using printf-like arguments.
+
+<p><em>NOTE:</em> this is only available is STDARG is defined by the library
+and you have the <code>stdarg.h</code> include file. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_vmessage ( char * <var>format</var>, va_list <var>args</var> )
+
+<p>Write a message into the dmalloc logfile using vprintf-like arguments.
+
+<p><em>NOTE:</em> this is only available is STDARG is defined by the library
+and you have the <code>stdarg.h</code> include file. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+void dmalloc_track ( dmalloc_track_t <var>track_func</var> )
+
+<p>Register an allocation tracking function which will be called each time
+an allocation occurs.  Pass in NULL to disable.  To take a look at what
+information is provided, see the dmalloc_track_t function typedef in
+dmalloc.h. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+unsigned long dmalloc_mark ( void )
+
+<p>Return to the caller the current "mark" which can be used later to
+dmalloc_log_changed pointers since this point.  Multiple marks can be
+saved and used. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+unsigned long dmalloc_log_changed ( unsigned long <var>mark</var>,
+int <var>not_freed_b</var>, int <var>freed_b</var>, int <var>details_b</var> )
+
+<p>Dump the pointers that have changed since the mark which was returned by
+dmalloc_mark.  If not_freed_b is set to non-0 then log the new pointers
+that are non-freed.  If free_b is set to non-0 then log the new pointers
+that are freed.  If details_b set to non-0 then dump the individual
+pointers that have changed otherwise just dump the summaries. 
+</TD></TR>
+</TABLE>
+
+<p>
+<table width="100%">
+<tr>
+<td align="left"> <b></b><i>
+</i></td>
+<td align="right">Function</td>
+</tr>
+</table>
+<table width="95%" align="center">
+<tr><td>
+const char * dmalloc_strerror ( int <var>errnum</var> )
+
+<p>This function returns the string representation of the error value in
+errnum (which probably should be dmalloc_errno).  This allows the
+logging of more verbose memory error messages.
+
+<p>You can also display the string representation of an error value by a
+call to the <code>dmalloc</code> program with a <code>-e #</code> option. 
+See <a href="#Dmalloc%20Program">Dmalloc Program</a>. 
+</TD></TR>
+</TABLE>
+
+<p><hr>
+Node:<a name="C++%20and%20the%20Library">C++ and the Library</a>,
+Next:<a rel=next href="#Disabling%20the%20Library">Disabling the Library</a>,
+Previous:<a rel=previous href="#Extensions">Extensions</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.5 Using the Library with C++</h2>
+
+<p>For those people using the C++ language, some special things need to be
+done to get the library to work.  The problem exists with the fact that
+the dynamic memory routines in C++ are <code>new()</code> and <code>delete()</code>
+as opposed to <code>malloc()</code> and <code>free()</code>.
+
+<p>The file <code>dmalloc.cc</code> is provided in the distribution which
+effectively redirects <code>new</code> to the more familiar <code>malloc</code> and
+<code>delete</code> to the more familiar <code>free</code>.  Compile and link this
+file in with the C++ program you want to debug.
+
+<p><em>NOTE</em>: The author is not a C++ hacker so feedback in the form of
+other hints and ideas for C++ users would be much appreciated.
+
+<p><hr>
+Node:<a name="Disabling%20the%20Library">Disabling the Library</a>,
+Next:<a rel=next href="#Using%20With%20a%20Debugger">Using With a Debugger</a>,
+Previous:<a rel=previous href="#C++%20and%20the%20Library">C++ and the Library</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.6 How to Disable the library</h2>
+
+<p>When you are finished with the development and debugging sessions, you
+may want to disable the dmalloc library and put in its place either the
+system's memory-allocation routines, gnu-malloc, or maybe your own. 
+Attempts have been made to make this a reasonably painless process.  The
+ease of the extraction depends heavily on how many of the library's
+features your made use of during your coding.
+
+<p>Reasonable suggestions are welcome as to how to improve this process
+while maintaining the effectiveness of the debugging.
+
+<ul>
+<li>If you want to <em>totally</em> disable the dmalloc library then you will
+need to recompile all the C files that include <code>dmalloc.h</code> while
+defining <code>DMALLOC_DISABLE</code>.  This will cause the dmalloc leap
+macros to not be applied.  See <a href="#Allocation%20Macros">Allocation Macros</a>.
+
+<pre>cc -g -DDMALLOC_DISABLE main.c
+</pre>
+
+<li>If you compiled any of your source modules with <code>DMALLOC_FUNC_CHECK</code>
+defined then you must first recompile all those modules without the flag
+enabled.
+
+<li>If you have not compiled all your source with <code>DMALLOC_DISABLED</code>
+defined then you need to link your program with the
+<code>libdmalloclp.a</code> library.
+
+<pre>cc main.o -L/usr/local/lib -ldmalloclp -lgmalloc
+</pre>
+
+<p>If you have disabled dmalloc with the <code>DMALLOC_DISABLED</code> flag or
+never included <code>dmalloc.h</code> in any of your C files, then you will
+not need the <code>libdmalloclp.a</code> library.
+
+<pre>cc -g main.o -L/usr/local/lib -lgmalloc
+</pre>
+
+<p>If you get unresolved references like <code>_malloc_leap</code> or
+<code>_dmalloc_bcopy</code> then something was not disabled as it should have
+been. 
+</ul>
+
+<p><hr>
+Node:<a name="Using%20With%20a%20Debugger">Using With a Debugger</a>,
+Next:<a rel=next href="#Using%20With%20Threads">Using With Threads</a>,
+Previous:<a rel=previous href="#Disabling%20the%20Library">Disabling the Library</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.7 Using Dmalloc With a Debugger</h2>
+
+<p>Here are a number of possible scenarios for using the dmalloc library to
+track down problems with your program.
+
+<p>You should first enable a logfile filename (I use <code>dmalloc</code>) and
+turn on a set of debug features.  You can use <kbd>dmalloc -l dmalloc
+low</kbd> to accomplish this.  If you are interested in having the error
+messages printed to your terminal as well, enable the <code>print-error</code>
+token by typing <kbd>dmalloc -p print-error</kbd> afterwards.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<p>Now you can enter your debugger (I use the <em>excellent</em> GNU debugger
+gdb), and put a break-point in <code>dmalloc_error()</code> which is the
+internal error routine for the library.  When your program is run, it
+will stop there if a memory problem is detected.
+
+<p>If you are using GDB, I would recommend adding the contents of
+<code>dmalloc.gdb</code> in the <code>contrib</code> subdirectory to your
+<code>.gdbinit</code> file in your home directory.  This enables the
+<code>dmalloc</code> command which will prompt you for the arguments to the
+dmalloc command and will set a break point in <code>dmalloc_error()</code>
+automatically.
+
+<ul>
+<li><a href="#General%20Errors">General Errors</a>:               Diagnosing general problems with a debugger. 
+<li><a href="#Memory%20Leaks">Memory Leaks</a>:                 Tracking down non-freed memory. 
+<li><a href="#Fence-Post%20Overruns">Fence-Post Overruns</a>:          Diagnosing fence-post overwritten memory. 
+</ul>
+
+<p><hr>
+Node:<a name="General%20Errors">General Errors</a>,
+Next:<a rel=next href="#Memory%20Leaks">Memory Leaks</a>,
+Previous:<a rel=previous href="#Using%20With%20a%20Debugger">Using With a Debugger</a>,
+Up:<a rel=up href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<br>
+
+<h3>3.7.1 Diagnosing General Problems with a Debugger</h3>
+
+<p>If your program stops at the <code>dmalloc_error()</code> routine then one of
+a number of problems could be happening.  Incorrect arguments could have
+been passed to a malloc call: asking for negative number of bytes,
+trying to realloc a non-heap pointer, etc..  There also could be a
+problem with the system's allocations: you've run out of memory, some
+other function in your program is using <code>sbrk</code>, etc.  However, it
+is most likely that some code that has been executed was naughty.
+
+<p>To get more information about the problem, first print via the debugger
+the dmalloc_errno variable to get the library's internal error code. 
+You can suspend your debugger and run <kbd>dmalloc -e
+value-returned-from-print</kbd> to get an English translation of the error. 
+A number of the error messages are designed to indicate specific
+problems with the library administrative structures and may not be
+user-friendly.
+
+<p>If the problem was due to the arguments or system allocations then the
+source of the problem has been found.  However, if some code did
+something wrong, you may have some more work to do to locate the actual
+problem.  The <code>check-heap</code> token should be enabled and the interval
+setting disabled or set to a low value so that the library can find the
+problem as close as possible to its source.  The code that was execute
+right before the library halted, can then be examined closely for
+irregularities.  See <a href="#Debug%20Tokens">Debug Tokens</a>, See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<p>You may also want to put calls to <code>dmalloc_verify(0)</code> in your code
+before the section which generated the error.  This should locate the
+problem faster by checking the library's structures at that point. 
+See <a href="#Extensions">Extensions</a>.
+
+<p><hr>
+Node:<a name="Memory%20Leaks">Memory Leaks</a>,
+Next:<a rel=next href="#Fence-Post%20Overruns">Fence-Post Overruns</a>,
+Previous:<a rel=previous href="#General%20Errors">General Errors</a>,
+Up:<a rel=up href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<br>
+
+<h3>3.7.2 Tracking Down Non-Freed Memory</h3>
+
+<p>So you've run your program, examined the log-file and discovered (to
+your horror) some un-freed memory.  Memory leaks can become large
+problems since even the smallest and most insignificant leak can starve
+the program given the right circumstances.
+
+<pre>not freed: '0x45008' (12 bytes) from 'ra=0x1f8f4'
+not freed: '0x45028' (12 bytes) from 'unknown'
+not freed: '0x45048' (10 bytes) from 'argv.c:1077'
+  known memory not freed: 1 pointer, 10 bytes
+unknown memory not freed: 2 pointers, 24 bytes
+</pre>
+
+<p>Above you will see a sample of some non-freed memory messages from the
+logfile.  In the first line the <code>0x45008</code> is the pointer that was
+not freed, the <code>12 bytes</code> is the size of the unfreed block, and the
+<code>ra=0x1f8f4</code> or return-address shows where the allocation
+originated from.  See <a href="#Return%20Address">Return Address</a>.
+
+<p>The systems which cannot provide return-address information show
+<code>unknown</code> instead, as in the 2nd line in the sample above.
+
+<p>The <code>argv.c:1077</code> information from the 3rd line shows the file and
+line number which allocated the memory which was not freed.  This
+information comes from the calls from C files which included
+<code>dmalloc.h</code>.  See <a href="#Allocation%20Macros">Allocation Macros</a>.
+
+<p>At the bottom of the sample it totals the memory for you and breaks it
+down to known memory (those calls which supplied the file/line
+information) and unknown (the rest).
+
+<p>Often, you may allocate memory in via <code>strdup()</code> or another
+routine, so the logfile listing where in the <code>strdup</code> routine the
+memory was allocated does not help locate the true source of the memory
+leak - the routine that called <code>strdup</code>.  Without a mechanism to
+trace the calling stack, there is no way for the library to see who the
+caller of the caller (so to speak) was.
+
+<p>However, there is a way to track down unfreed memory in this
+circumstance.  You need to compile the library with
+<code>STORE_SEEN_COUNT</code> defined in <code>conf.h</code>.  The library will then
+record how many times a pointer has been allocated or freed.  It will
+display the unfreed memory as:
+
+<pre>not freed: '0x45008|s3' (12 bytes) from 'ra=0x1f8f4'
+</pre>
+
+<p>The <code>STORE_SEEN_COUNT</code> option adds a <code>|s#</code> qualifier to the
+address.  This means that the address in question was seen <code>#</code> many
+times.  In the above example, the address <code>0x45008</code> was seen
+<code>3</code> times.  The last time it was allocated, it was not freed.
+
+<p>How can a pointer be "seen" 3 times?  Let say you <code>strdup</code> a
+string of 12 characters and get address <code>0x45008</code> - this is #1
+time the pointer is seen.  You then free the pointer (seen #2) but later
+<code>strdup</code> another 12 character string and it gets the <code>0x45008</code>
+address from the free list (seen #3).
+
+<p>So to find out who is allocating this particular 12 bytes the 3rd time,
+try <kbd>dmalloc -a 0x45008:3</kbd>.  The library will stop the program the
+third time it sees the <code>0x45008</code> address.  You then enter a
+debugger and put a break point at <code>dmalloc_error</code>.  Run the program
+and when the breakpoint is reached you can examine the stack frame to
+determine who called <code>strdup</code> to allocate the pointer.
+
+<p>To not bother with the <code>STORE_SEEN_COUNT</code> feature, you can also run
+your program with the <code>never-reuse</code> token enabled.  This token will
+cause the library to never reuse memory that has been freed.  Unique
+addresses are always generated.  This should be used with caution since
+it may cause your program to run out of memory.
+
+<p><hr>
+Node:<a name="Fence-Post%20Overruns">Fence-Post Overruns</a>,
+Previous:<a rel=previous href="#Memory%20Leaks">Memory Leaks</a>,
+Up:<a rel=up href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<br>
+
+<h3>3.7.3 Diagnosing Fence-Post Overwritten Memory</h3>
+
+<p>For a definition of fence-posts please see the "Features" section. 
+See <a href="#Features">Features</a>.
+
+<p>If you have encountered a fence-post memory error, the logfile should be
+able to tell you the offending address.
+
+<pre>free: failed UNDER picket-fence magic-number checking:
+pointer '0x1d008' from 'dmalloc_t.c:427'
+Dump of proper fence-bottom bytes: '\e\253\300\300\e\253\300\300'
+Dump of '0x1d008'-8: '\e\253\300\300WOW!\003\001pforger\023\001\123'
+</pre>
+
+<p>The above sample shows that the pointer <code>0x1d008</code> has had its lower
+fence-post area overwritten.  This means that the code wrote below the
+bottom of the address or above the address right below this one.  In the
+sample, the string that did it was <code>WOW!</code>.
+
+<p>The library first shows you what the proper fence-post information
+should look like, and then shows what the pointer's bad information was. 
+If it cannot print the character, it will display the value as
+<code>\ddd</code> where ddd are three octal digits.
+
+<p>By enabling the <code>check-heap</code> debugging token and assigning the
+interval setting to a low number, you should be able to locate
+approximately when this problem happened.  See <a href="#Debug%20Tokens">Debug Tokens</a>,
+See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<p><hr>
+Node:<a name="Using%20With%20Threads">Using With Threads</a>,
+Previous:<a rel=previous href="#Using%20With%20a%20Debugger">Using With a Debugger</a>,
+Up:<a rel=up href="#Programming">Programming</a>
+<br>
+
+<h2>3.8 Using the Library with a Thread Package</h2>
+
+<p>This is the newest section of the library and therefore contains the
+least information about a subject on which I probably could write a
+book.  My apologies.
+
+<p>Threads are special operating system facilities which allow your
+programs to have multiple threads of execution (hence the name).  In
+effect your program can be doing a number of things "at the same
+time".  This allows you to take full advantage of modern operating
+system scheduling and multi-processor hardware.  If I've already lost
+you or if any of the terminology below does not make sense, see manuals
+about POSIX threads (pthreads) before going any further.  O'Reilly
+publishes a pretty good pthreads manual for example.
+
+<p>The support for threads in dmalloc is minimal although probably adequate
+for most if not all testing scenarios.  It provides support for mutex
+locking itself to protect against race conditions that result in
+multiple simultaneous execution.  One of the major problems is that most
+thread libraries uses malloc themselves.  Since all of dmalloc's
+initialization happens when a call to malloc is made, we may be
+attempting to initialize or lock the mutex while the thread library is
+booting up.  A baaaad thing since thread libraries aren't reentrant.
+
+<p>The solution to this problem is to have the library not initialize or
+lock its mutex variable until after a certain number of allocation calls
+have been completed.  If the library does not wait before initializing
+the locks, the thread library will probably core dump.  If it waits too
+long then it can't protect itself from multiple execution and it will
+abort or other bad things might happen.  You adjust the number of times
+to wait at runtime with the "lock-on" option to the dmalloc program
+(for example <kbd>dmalloc -o 20</kbd>).  See <a href="#Dmalloc%20Program">Dmalloc Program</a>.  Times
+values between 2 and 30 are probably good although operating systems
+will vary significantly.  You know its too low if your program core
+dumps and too high if the library generates an exception.
+
+<p>An additional complexity is when we are initializing the lock before
+mutex locking around the library.  As mentioned, the initialization
+itself may generate a malloc call causing the library to go recursive
+and the pthread library to possibly core dump. With the THREAD_INIT_LOCK
+setting defined in <code>settings.h</code>, you can tune how many times before
+we start locking to try and initialize the mutex lock.  It defaults to 2
+which seems to work for me.  If people need to have this runtime
+configurable or would like to present an alternative default, please let
+me know.
+
+<p>To build the library with the threaded stubs type <kbd>make threads</kbd>
+which should build <code>libdmallocth.a</code>.  The auto-configurations for
+these functions is in its infancy and may or may not work depending on
+the script's ability to detect your local thread functionality.  Feel
+free to send me mail with comments or improvements to them.
+
+<p>So that's it.  If you have any specific questions or would like addition
+information posted in this section, please let me know.  Experienced
+thread programmers only please.
+
+<p><hr>
+Node:<a name="Dmalloc%20Program">Dmalloc Program</a>,
+Next:<a rel=next href="#Source%20Code">Source Code</a>,
+Previous:<a rel=previous href="#Programming">Programming</a>,
+Up:<a rel=up href="#Top">Top</a>
+<br>
+
+<h1>4 Dmalloc Utility Program</h1>
+
+<p>The dmalloc program is designed to assist in the setting of the
+environment variable <code>DMALLOC_OPTIONS</code>.  See <a href="#Environment%20Variable">Environment Variable</a>.  It is designed to print the shell commands necessary to make
+the appropriate changes to the environment.  Unfortunately, it cannot
+make the changes on its own so the output from dmalloc should be sent
+through the <code>eval</code> shell command which will do the commands.
+
+<ul>
+<li><a href="#Shell%20Alias">Shell Alias</a>:                  Using a shell alias with the utility. 
+<li><a href="#Utility%20Usage">Utility Usage</a>:                How to use the dmalloc program. 
+<li><a href="#Environment%20Variable">Environment Variable</a>:         Environment variable name and features. 
+<li><a href="#Debug%20Tokens">Debug Tokens</a>:                 Description of the debugging tokens. 
+<li><a href="#RC%20File">RC File</a>:                      Format of the runtime configuration file. 
+</ul>
+
+<p><hr>
+Node:<a name="Shell%20Alias">Shell Alias</a>,
+Next:<a rel=next href="#Utility%20Usage">Utility Usage</a>,
+Previous:<a rel=previous href="#Dmalloc%20Program">Dmalloc Program</a>,
+Up:<a rel=up href="#Dmalloc%20Program">Dmalloc Program</a>
+<br>
+
+<h2>4.1 Using a Shell Alias with the Utility</h2>
+
+<p>The dmalloc program is designed to assist in the setting of the
+environment variable <code>DMALLOC_OPTIONS</code>.  See <a href="#Environment%20Variable">Environment Variable</a>.  It is designed to print the shell commands necessary to make
+the appropriate changes to the environment.  Unfortunately, it cannot
+make the changes on its own so the output from dmalloc should be sent
+through the <code>eval</code> shell command which will do the commands.
+
+<p>With shells that have aliasing or macro capabilities: csh, bash, ksh,
+tcsh, zsh, etc., setting up an alias to dmalloc to do the eval call is
+recommended.  Bash, ksh, and zsh users should add the following to their
+<code>.bashrc</code>, <code>.profile</code>, or <code>.zshrc</code> file respectively
+(notice the <kbd>-b</kbd> option for bourne shell output):
+
+<pre>function dmalloc { eval `command dmalloc -b $*`; }
+</pre>
+
+<p>If you are <em>still</em> using csh or tcsh, you should add the following
+to your <code>.cshrc</code> file (notice the <kbd>-C</kbd> option for c-shell
+output):
+
+<pre>alias dmalloc 'eval `\dmalloc -C \!*`'
+</pre>
+
+<p>This allows the user to execute the dmalloc command as <code>dmalloc
+arguments</code>.
+
+<p>Users of versions of the Bourne shell (usually known as /bin/sh) that
+don't have command functions will need to send the output to a temporary
+file and the read it back in with the "." command:
+
+<pre>$  dmalloc -b arguments... &gt; /tmp/out
+$  . /tmp/out
+</pre>
+
+<p><hr>
+Node:<a name="Utility%20Usage">Utility Usage</a>,
+Next:<a rel=next href="#Environment%20Variable">Environment Variable</a>,
+Previous:<a rel=previous href="#Shell%20Alias">Shell Alias</a>,
+Up:<a rel=up href="#Dmalloc%20Program">Dmalloc Program</a>
+<br>
+
+<h2>4.2 How to Use the Dmalloc Program</h2>
+
+<p>The most basic usage for the program is <code>dmalloc [-bC] tag</code>.  The
+<code>-b</code> or <code>-C</code> (either but not both flags used at a time) are
+for generating Bourne or C shell type commands respectively.  dmalloc
+will try and use the <code>SHELL</code> environment variable to determine
+whether bourne or C shell commands should be generated but you may want
+to explicitly specify the correct flag.
+
+<p>The <code>tag</code> argument to dmalloc should match a line from the user's
+runtime configuration file or should be one of the built-in tags. 
+See <a href="#RC%20File">RC File</a>.  If no tag is specified and no other option-commands
+used, dmalloc will display the current settings of the environment
+variable.  It is useful to specify one of the verbose options when doing
+this.
+
+<p>To find out the usage for the debug malloc program try <code>dmalloc
+--usage-long</code>.  The standardized usage message that will be displayed is
+one of the many features of the argv library included with this package.
+
+<p>It is available on the web at <a href="http://256.com/sources/argv/">http://256.com/sources/argv/</a>.  See
+the documentation there for more information.
+
+<p>Here is a detailed list of the flags that can passed to dmalloc:
+
+<dl>
+<dt><code>-a address</code>
+<dd>Set the <code>addr</code> part of the <code>DMALLOC_OPTIONS</code> variable to
+address (or alternatively address:number).
+
+<br><dt><code>-b</code>
+<dd>Output Bourne shell type commands.
+
+<br><dt><code>-C</code>
+<dd>Output C shell type commands.
+
+<br><dt><code>-c</code>
+<dd>Clear/unset all of the settings not specified with other arguments.  You
+can do this automatically when you set to a new tag with the <kbd>-r</kbd>
+option.
+
+<p><em>NOTE</em>: clear will never unset the <code>debug</code> setting.  Use
+<kbd>-d 0</kbd> or a tag to <code>none</code> to achieve this.
+
+<br><dt><code>-d bitmask</code>
+<dd>Set the <code>debug</code> part of the <code>DMALLOC_OPTIONS</code> env variable to
+the bitmask value which should be in hex.  This is overridden (and
+unnecessary) if a tag is specified.
+
+<br><dt><code>-D</code>
+<dd>List all of the debug-tokens.  Useful for finding a token to be used
+with the <kbd>-p</kbd> or <kbd>-m</kbd> options.  Use with <kbd>-v</kbd> or <kbd>-V</kbd>
+verbose options.
+
+<br><dt><code>-e errno</code>
+<dd>Print the dmalloc error string that corresponds to the error number
+errno.
+
+<br><dt><code>-f filename</code>
+<dd>Use this configuration file instead of the RC file
+<code>$HOME/.dmallocrc</code>.
+
+<br><dt><code>-i number</code>
+<dd>Set the checking interval to number.  If the <code>check-heap</code> token is
+enabled, this causes the library to only check the heap every Nth time
+which can <em>significantly</em> increase the running speed of your
+program.  If a problem is found, however, this limits your ability to
+determine when the problem occurred.  Try values of 50 or 100 initially.
+
+<br><dt><code>-k</code>
+<dd>Do not reset all of the settings when a tag is specified.  This
+specifically overrides the <kbd>-r</kbd> option and is provided here to
+override <kbd>-r</kbd> if it has been added to the dmalloc alias.
+
+<br><dt><code>-l filename</code>
+<dd>Write the debugging output and other log-file information to filename.
+
+<br><dt><code>-L</code>
+<dd>Output the debug-value not in hex but by individual debug-tokens in long
+form.
+
+<br><dt><code>-m token(s)</code>
+<dd>Remove (minus) the debug capabilities of token(s) from the current debug
+setting or from the selected tag (or <kbd>-d</kbd> value).  Multiple <kbd>-m</kbd>
+options can be specified.
+
+<br><dt><code>-n</code>
+<dd>Without changing the environment, output the commands resulting from the
+supplied options.
+
+<br><dt><code>-o times</code>
+<dd>Set the "lock-on" period which dictates with the threaded version of
+the library to not initialize or lock the mutex lock around the library
+until after a certain number of allocation calls have been made.  Some
+number between 2 and 30 is probably good.  See the "Using With
+Threads" section for more information about the operation of the
+library with threads.  See <a href="#Using%20With%20Threads">Using With Threads</a>.
+
+<br><dt><code>-p token(s)</code>
+<dd>Add (plus) the debug capabilities of token(s) to the current debug
+setting or to the selected tag (or <kbd>-d</kbd> value).  Multiple <kbd>-p</kbd>
+options can be specified.
+
+<br><dt><code>-r</code>
+<dd>Remove (unset) all settings when using a tag.  This is useful when you
+are returning to a standard development tag and want the logfile,
+address, and interval settings to be cleared automatically.  If you want
+this behavior by default, this can be put into the dmalloc alias.
+
+<br><dt><code>-s number</code>
+<dd>Set the <code>start</code> part of the <code>DMALLOC_OPTIONS</code> env variable to
+number (alternatively <code>file:line</code>).
+
+<br><dt><code>-S</code>
+<dd>Output the debug-value not in hex but by individual debug-tokens in short
+form.
+
+<br><dt><code>-t</code>
+<dd>List all of the tags in the rc-file.  Use with <kbd>-v</kbd> or <kbd>-V</kbd>
+verbose options.
+
+<br><dt><code>-v</code>
+<dd>Give verbose output.  Especially useful when dumping current settings or
+listing all of the tags. 
+</dl>
+
+<p>If no arguments are specified, dmalloc dumps out the current settings
+that you have for the environment variable.  For example:
+
+<pre>Debug-Flags  '0x40005c7' (runtime)
+Address      0x1f008, count = 3
+Interval     100
+Logpath      'malloc'
+Start-File   not-set
+</pre>
+
+<p>With a -v option and no arguments, dmalloc dumps out the current
+settings in a verbose manner.  For example:
+
+<pre>Debug-Flags  '0x40005c7' (runtime)
+   log-stats, log-non-free, log-blocks, log-unknown,
+   log-bad-space, check-fence, catch-null
+Address      0x1f008, count = 10
+Interval     100
+Logpath      'malloc'
+Start-File   not-set
+</pre>
+
+<p>Here are some examples of dmalloc usage:
+
+<pre># start tough debugging, check the heap every 100 times,
+# send the log information to file 'dmalloc'
+dmalloc high -i 100 -l dmalloc
+
+# find out what error code 20 is (from the logfile)
+dmalloc -e 20
+
+# cause the library to halt itself when it sees the address 0x34238
+# for the 6th time.
+dmalloc -a 0x34238:6
+
+# return to the normal 'runtime' settings and clear out all
+# other settings
+dmalloc -c runtime
+
+# enable basic 'low' settings plus (-p) the logging of
+# transactions (log-trans) to file 'dmalloc'
+dmalloc low -p log-trans -l dmalloc
+
+# print out the current settings with Very-verbose output
+dmalloc -V
+
+# list the available debug malloc tokens with Very-verbose output
+dmalloc -DV
+
+# list the available tags from the rc file with verbose output
+dmalloc -tv
+</pre>
+
+<p><hr>
+Node:<a name="Environment%20Variable">Environment Variable</a>,
+Next:<a rel=next href="#Debug%20Tokens">Debug Tokens</a>,
+Previous:<a rel=previous href="#Utility%20Usage">Utility Usage</a>,
+Up:<a rel=up href="#Dmalloc%20Program">Dmalloc Program</a>
+<br>
+
+<h2>4.3 Environment Variable Name and Features</h2>
+
+<p>An <dfn>environment variable</dfn> is a variable that is part of the user's
+working environment and is shared by all the programs.  The
+<code>DMALLOC_OPTIONS</code> variable is used by the dmalloc library to enable
+or disable the memory debugging features, at runtime.  It can be set
+either by hand or with the help of the dmalloc program.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<p>To set it by hand, Bourne shell (sh, bash, ksh, or zsh) users should use:
+
+<pre>DMALLOC_OPTIONS=value
+export DMALLOC_OPTIONS
+</pre>
+
+<p>C shell (csh or tcsh) users need to invoke:
+
+<pre>setenv DMALLOC_OPTIONS value
+</pre>
+
+<p>The value in the above examples is a comma separated list of tokens each
+having a corresponding value.  The tokens are described below:
+
+<dl>
+<dt><code>debug</code>
+<dd>This should be set to a value in hexadecimal which corresponds to the
+functionality token values added together.  See <a href="#Debug%20Tokens">Debug Tokens</a>.  For
+instance, if the user wanted to enable the logging of memory
+transactions (value <code>0x008</code>) and wanted to check fence-post memory
+(value <code>0x400</code>) then <code>debug</code> should be set to <code>0x408</code>
+(<code>0x008</code> + <code>0x400</code>).
+
+<p><em>NOTE</em>: You don't have to worry about remembering all the hex
+values of the tokens because the dmalloc program automates the setting
+of this variable especially.
+
+<p><em>NOTE</em>: You can also specify the debug tokens directly, separated
+by commas.  See <a href="#Debug%20Tokens">Debug Tokens</a>.  If <code>debug</code> and the tokens are
+both used, the token values will be added to the debug value.
+
+<br><dt><code>log</code>
+<dd>Set this to a filename so that if <code>debug</code> has logging enabled, the
+library can log transactions, administration information, and/or errors
+to the file so memory problems and usage can be tracked.
+
+<p>To get different logfiles for different processes, you can assign
+<code>log</code> to a string with <code>%d</code> in it (for instance
+<code>logfile.%d</code>).  This will be replaced with the pid of the running
+process (for instance <code>logfile.2451</code>).
+
+<p><em>WARNING</em>: it is easy to core dump any program with dmalloc, if
+you send in a format with arguments other than the one <code>%d</code>.
+
+<br><dt><code>addr</code>
+<dd>When this is set to a hex address (taken from the dmalloc log-file for
+instance) dmalloc will abort when it finds itself either allocating or
+freeing that address.
+
+<p>The address can also have an <code>:number</code> argument.  For instance, if
+it was set it to <code>0x3e45:10</code>, the library will kill itself the 10th
+time it sees address <code>0x3e45</code>.  By setting the number argument to
+0, the program will never stop when it sees the address.  This is useful
+for logging all activity on the address and makes it easier to track
+down specific addresses not being freed.
+
+<p>This works well in conjunction with the <code>STORE_SEEN_COUNT</code> option. 
+See <a href="#Memory%20Leaks">Memory Leaks</a>.
+
+<p><em>NOTE</em>: dmalloc will also log all activity on this address along
+with a count.
+
+<br><dt><code>inter</code>
+<dd>By setting this to a number X, dmalloc will only check the heap every X
+times.  This means a number of debugging features can be enabled while
+still running the program within a finite amount of time.
+
+<p>A setting of <code>100</code> works well with reasonably memory intensive
+programs.  This of course means that the library will not catch errors
+exactly when they happen but possibly 100 library calls later.
+
+<br><dt><code>start</code>
+<dd>Set this to a number X and dmalloc will begin checking the heap after X
+times.  This means the intensive debugging can be started after a
+certain point in a program.
+
+<p><code>start</code> also has the format file:line.  For instance, if it is set
+to <code>dmalloc_t.c:126</code> dmalloc will start checking the heap after it
+sees a dmalloc call from the <code>dmalloc_t.c</code> file, line number 126. 
+If line number is 0 then dmalloc will start checking the heap after it
+sees a call from anywhere in the <code>dmalloc_t.c</code> file.
+
+<p>This allows the intensive debugging to be started after a certain
+routine or file has been reached in the program. 
+</dl>
+
+<p>Some examples are:
+
+<pre># turn on transaction and stats logging and set 'malloc' as the log-file
+setenv DMALLOC_OPTIONS log-trans,log-stats,log=malloc
+
+# enable debug flags 0x1f as well as heap-checking and set the interval
+# to be 100
+setenv DMALLOC_OPTIONS debug=0x1f,check-heap,inter=100
+
+# enable 'malloc' as the log-file, watch for address '0x1234', and start
+# checking when we see file.c line 123
+setenv DMALLOC_OPTIONS log=malloc,addr=0x1234,start=file.c:123
+</pre>
+
+<p><hr>
+Node:<a name="Debug%20Tokens">Debug Tokens</a>,
+Next:<a rel=next href="#RC%20File">RC File</a>,
+Previous:<a rel=previous href="#Environment%20Variable">Environment Variable</a>,
+Up:<a rel=up href="#Dmalloc%20Program">Dmalloc Program</a>
+<br>
+
+<h2>4.4 Description of the Debugging Tokens</h2>
+
+<p>The below tokens and their corresponding descriptions are for the
+setting of the debug library setting in the environment variable. 
+See <a href="#Environment%20Variable">Environment Variable</a>.  They should be specified in the user's
+<code>.dmallocrc</code> file.  See <a href="#RC%20File">RC File</a>.
+
+<p>Each token, when specified, enables a specific debugging feature.  For
+instance, if you have the log-stats token enabled, the library will log
+general statistics to the logfile.
+
+<p>To get this information on the fly, use <kbd>dmalloc -DV</kbd>.  This will
+print out the Debug tokens in Very-verbose mode.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>.
+
+<dl>
+<dt><code>none</code>
+<dd>No debugging functionality
+
+<br><dt><code>log-stats</code>
+<dd>Log general statistics when dmalloc_shutdown or dmalloc_log_stats is
+called.
+
+<br><dt><code>log-non-free</code>
+<dd>Log non-freed memory pointers when dmalloc_shutdown or dmalloc_log_unfreed
+is called.
+
+<br><dt><code>log-thread-id</code>
+<dd>For systems that have multi-threaded programs (don't worry if this does
+not make sense to you), log thread-id for allocated pointer (see
+<code>conf.h</code>).
+
+<br><dt><code>log-trans</code>
+<dd>Log general memory transactions (quite verbose).
+
+<br><dt><code>log-stamp</code>
+<dd>Log a time stamp for all messages.
+
+<br><dt><code>log-admin</code>
+<dd>Log administrative information (quite verbose).
+
+<br><dt><code>log-blocks</code>
+<dd>Log detailed block information when dmalloc_log_heap_map is called.
+
+<br><dt><code>log-unknown</code>
+<dd>Like log-non-free but logs non-freed memory pointers that did not have
+file/line information associated with them.
+
+<br><dt><code>log-bad-space</code>
+<dd>Log actual bytes in and around bad pointers.
+
+<br><dt><code>log-nonfree-space</code>
+<dd>Log actual bytes in non-freed pointers.
+
+<br><dt><code>log-elapsed-time</code>
+<dd>Log elapsed-time for allocated pointers (see <code>conf.h</code>).
+
+<br><dt><code>log-current-time</code>
+<dd>Log current-time for allocated pointers (see <code>conf.h</code>).
+
+<br><dt><code>check-fence</code>
+<dd>Check fence-post memory areas.
+
+<br><dt><code>check-heap</code>
+<dd>Verify heap administrative structure.
+
+<br><dt><code>check-lists</code>
+<dd>Examine internal heap linked-lists.
+
+<br><dt><code>check-blank</code>
+<dd>Check to see if space that was blanked by free-blank or alloc-blank has
+been overwritten.  If this is enabled then it will enable free-blank and
+alloc-blank automatically.
+
+<br><dt><code>check-funcs</code>
+<dd>Check the arguments of some functions (mostly string operations) looking
+for bad pointers.
+
+<br><dt><code>force-linear</code>
+<dd>Have the heap complain when additional program functionality seems to
+have made use of the system's heap-allocation routine <code>sbrk</code>
+directly behind the dmalloc library's back.  This is disabled by default
+since an increasing number of operating system functions seem to be
+doing this, especially pthreads packages.
+
+<br><dt><code>catch-signals</code>
+<dd>Shutdown the library automatically on SIGHUP, SIGINT, or SIGTERM.  This
+will cause the library to dump its statistics (if requested) when you
+press control-c on the program (for example).
+
+<br><dt><code>realloc-copy</code>
+<dd>Always copy data to a new pointer when realloc.
+
+<br><dt><code>free-blank</code>
+<dd>Write special bytes (decimal 197, octal 0305, hex 0xc5) into space when
+it is freed.  The same bytes are written when memory is allocated if
+alloc-blank is enabled.
+
+<br><dt><code>error-abort</code>
+<dd>Abort the program (and dump core) on errors.  See <code>error-dump</code> below.
+
+<br><dt><code>alloc-blank</code>
+<dd>Write special bytes (decimal 197, octal 0305, hex 0xc5) into space when
+it is allocated.  The same bytes are written when memory is freed if
+free-blank is enabled.
+
+<br><dt><code>heap-check-map</code>
+<dd>Log a heap-map to the logfile every time the heap is checked.
+
+<br><dt><code>print-messages</code>
+<dd>Log any errors and messages to the screen via standard-error.
+
+<br><dt><code>catch-null</code>
+<dd>Abort the program immediately if the library fails to get more heap
+space from sbrk.
+
+<br><dt><code>never-reuse</code>
+<dd>Have the heap never use space that has been used before and freed. 
+See <a href="#Memory%20Leaks">Memory Leaks</a>.  <em>WARNING</em>: This should be used with caution
+since you may run out of heap space.
+
+<br><dt><code>allow-free-null</code>
+<dd>The library will not generate an error when a program tries to free a
+NULL pointer.  See ALLOW_FREE_NULL and ALLOW_FREE_NULL_MESSAGE settings
+in the <code>settings.h</code> file which change the default behavior.
+
+<p><em>NOTE</em>: This does not impact the ALLOW_REALLOC_NULL compilation
+options which can be adjusted in <code>conf.h</code>.
+
+<br><dt><code>error-dump</code>
+<dd>Dump core on error and then continue.  Later core dumps overwrite
+earlier ones if the program encounters more than one error.  See
+<code>error-abort</code> above.
+
+<p><em>NOTE</em>: This will only work if your system supports the <code>fork</code>
+system call and the configuration utility was able to fork without going
+recursive.
+
+</dl>
+
+<p><hr>
+Node:<a name="RC%20File">RC File</a>,
+Previous:<a rel=previous href="#Debug%20Tokens">Debug Tokens</a>,
+Up:<a rel=up href="#Dmalloc%20Program">Dmalloc Program</a>
+<br>
+
+<h2>4.5 Format of the Runtime Configuration File</h2>
+
+<p>By using a <dfn>RC File</dfn> (or runtime configuration file) you can alias
+tags to combinations of debug tokens.  See <a href="#Debug%20Tokens">Debug Tokens</a>.
+
+<p><em>NOTE</em>: For beginning users, the dmalloc program has a couple of
+tags built into it so it is not necessary for you to setup a RC file:
+
+<dl>
+<dt><code>runtime</code>
+<dd>enables basic runtime tests
+
+<br><dt><code>low</code>
+<dd>turns on minimal checking of heap structures
+
+<br><dt><code>medium</code>
+<dd>significant checking of heap areas
+
+<br><dt><code>high</code>
+<dd>extensive checking of heap areas
+
+<br><dt><code>all</code>
+<dd>turns on all the checking possible.  This generates a multitude of log
+messages without many more tests than high. 
+</dl>
+
+<p>For expert users, a sample <code>dmallocrc</code> file has been provided but
+you are encouraged to roll your own combinations.  The name of default
+rc-file is <code>$HOME/.dmallocrc</code>.  The <code>$HOME</code> environment
+variable should be set by the system to point to your home-directory.
+
+<p>The file should contain lines in the general form of:
+
+<pre>tag     token1, token2, <small>...</small>
+</pre>
+
+<p><code>tag</code> is to be matched with the tag argument passed to the dmalloc
+program, while <code>token1, token2, <small>...</small></code> are debug capability
+tokens.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>, <a href="#Debug%20Tokens">Debug Tokens</a>.
+
+<p>A line can be finished with a <code>\</code> meaning it continues onto the
+next line.  Lines beginning with <code>#</code> are treated as comments and
+are ignored along with empty lines.
+
+<p>Here is an example of a <code>.dmallocrc</code> file:
+
+<pre>#
+# Dmalloc runtime configuration file for the debug malloc library
+#
+
+# no debugging
+none    none
+
+# basic debugging
+debug1  log-stats, log-non-free, check-fence
+
+# more logging and some heap checking
+debug2  log-stats, log-non-free, log-trans, \
+        check-fence, check-heap, check-lists, error-abort
+
+# good utilities
+debug3  log-stats, log-non-free, log-trans, \
+        log-admin, check-fence, check-heap, check-lists, realloc-copy, \
+        free-blank, error-abort
+
+<small>...</small>
+</pre>
+
+<p>For example, with the above file installed, you can type <code>dmalloc
+debug1</code> after setting up your shell alias.  See <a href="#Dmalloc%20Program">Dmalloc Program</a>. 
+This enables the logging of statistics, the logging of non-freed memory,
+and the checking of fence-post memory areas.
+
+<p>Enter <code>dmalloc none</code> to disable all memory debugging features.
+
+<p><hr>
+Node:<a name="Source%20Code">Source Code</a>,
+Next:<a rel=next href="#Index%20of%20Concepts">Index of Concepts</a>,
+Previous:<a rel=previous href="#Dmalloc%20Program">Dmalloc Program</a>,
+Up:<a rel=up href="#Top">Top</a>
+<br>
+
+<h1>5 Information on the Source Code</h1>
+
+<ul>
+<li><a href="#Definitions">Definitions</a>:                  Definition of terms and other information. 
+<li><a href="#Compatibility">Compatibility</a>:                General compatibility concerns. 
+<li><a href="#Portability">Portability</a>:                  Issues important for porting the library. 
+</ul>
+
+<p><hr>
+Node:<a name="Definitions">Definitions</a>,
+Next:<a rel=next href="#Compatibility">Compatibility</a>,
+Previous:<a rel=previous href="#Source%20Code">Source Code</a>,
+Up:<a rel=up href="#Source%20Code">Source Code</a>
+<br>
+
+<h2>5.1 Definition of Terms and other Information</h2>
+
+<p>Here are a couple definitions and other information for those interested
+in "picking the brain" of the library.  The code is a little ugly here
+and there and it conforms to the Gray-Watson handbook of coding
+standards only.
+
+<dl>
+<dt><dfn>bblock</dfn>
+<dd>basic block containing 2 ^ BASIC_BLOCK bytes of info
+
+<br><dt><dfn>bblock_adm</dfn>
+<dd>administration for a set of basic blocks
+
+<br><dt><dfn>dblock</dfn>
+<dd>divided block containing some base 2 number of blocks smaller than a
+basic block.
+
+<br><dt><dfn>dblock_adm</dfn>
+<dd>administration for a set of divided blocks
+
+<br><dt><dfn>chunk</dfn>
+<dd>some anonymous amount of memory
+</dl>
+
+<p>For more information about administration structures, see the code and
+comments from <code>chunk_loc.h</code>.
+
+<p><hr>
+Node:<a name="Compatibility">Compatibility</a>,
+Next:<a rel=next href="#Portability">Portability</a>,
+Previous:<a rel=previous href="#Definitions">Definitions</a>,
+Up:<a rel=up href="#Source%20Code">Source Code</a>
+<br>
+
+<h2>5.2 General Compatibility Concerns</h2>
+
+<ul>
+<li>Realloc() backwards compatibility with being able to realloc from the
+last freed block is <em>not</em> supported.  The author is interested to
+know who is using this (cough, cough) feature and for what reason.
+
+<li>Realloc() of a NULL pointer is supported in which case the library will
+just make a call to malloc().  This can be disabled with the help of a
+manual compilation option in the <code>conf.h</code> file.
+
+<li>Some systems allow free(0) to not be an error for some reason.  Since 0
+is not a valid address returned by the malloc call, it is debatable that
+this should be allowed.  See <code>conf.h</code> for some manual compilation
+options to handle this.
+
+<li>Aside from possibly being slower than the system's memory allocation
+functions, the library should be fully compatible with the standard
+memory routines.  If this is <em>not</em> the case, please bring this to
+my attention. 
+</ul>
+
+<p><hr>
+Node:<a name="Portability">Portability</a>,
+Previous:<a rel=previous href="#Compatibility">Compatibility</a>,
+Up:<a rel=up href="#Source%20Code">Source Code</a>
+<br>
+
+<h2>5.3 Issues Important for Porting the Library</h2>
+
+<p>General portability issues center around:
+
+<ul>
+<li>sbrk or compatible function usages
+
+<li>Whether the systems' heap grows towards high or low memory.  The chunk.c
+code is designed (loosely) around the fact that consecutive calls to
+sbrk should give higher memory addresses.
+
+<p>The library has not been tested on a system whose heap grows towards low
+memory.  If you are trying to run the library on such a system please
+contact the author.
+
+</p><li>The locating of the caller's address from the dmalloc functions. 
+This is useful in locating problems from dmalloc functions called from C
+files which did not include <code>dmalloc.h</code>: C library calls for
+instance.
+
+<p>See <code>return.h</code> for the available architecture/compiler
+combinations.  You may want to examine the assembly code from gcc (GNUs
+superior c-compiler) version 2+ being run on the following code.  It
+should give you a good start on building a hack for your box.
+
+<pre>static char * x;
+
+a()
+{
+        x = __builtin_return_address(0);
+}
+
+main()
+{
+        a();
+}
+</pre>
+
+</ul>
+
+<p><hr>
+Node:<a name="Index%20of%20Concepts">Index of Concepts</a>,
+Previous:<a rel=previous href="#Source%20Code">Source Code</a>,
+Up:<a rel=up href="#Top">Top</a>
+<br>
+
+<h1>Index of Concepts</h1>
+
+<ul compact>
+<li>.dmallocrc file: <a href="#RC%20File">RC File</a>
+<li>0305: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>0xc5: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>197: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>305: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>address locating: <a href="#Environment%20Variable">Environment Variable</a>
+<li>address setting: <a href="#Environment%20Variable">Environment Variable</a>
+<li>address to look for: <a href="#Extensions">Extensions</a>
+<li>alloc-blank: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>allocation basics: <a href="#Allocation%20Basics">Allocation Basics</a>
+<li>allocation macros: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>Allocation of zeros: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>allow-free-null: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>ANSI-C compiler: <a href="#Installation">Installation</a>
+<li>argument checking: <a href="#Argument%20Checking">Argument Checking</a>
+<li>assembly hacks: <a href="#Return%20Address">Return Address</a>
+<li>author: <a href="#Top">Top</a>
+<li>automatic shutdown: <a href="#Getting%20Started">Getting Started</a>
+<li>bash usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>basic allocation information: <a href="#Allocation%20Basics">Allocation Basics</a>
+<li>basic definitions: <a href="#Basic%20Definitions">Basic Definitions</a>
+<li>beginning: <a href="#Getting%20Started">Getting Started</a>
+<li>blank space: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>blanking memory: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>bounds checking: <a href="#Features">Features</a>
+<li>Bourne shell usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>building the library: <a href="#Installation">Installation</a>
+<li>C shell usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>c++ usage: <a href="#C++%20and%20the%20Library">C++ and the Library</a>
+<li>c5: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>caller's address: <a href="#Return%20Address">Return Address</a>
+<li>calloc: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>catch-null: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>catch-signals: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>changed memory: <a href="#Extensions">Extensions</a>
+<li>check-blank: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>check-fence: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>check-funcs: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>check-heap: <a href="#Troubleshooting">Troubleshooting</a>, <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>check-lists: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>checking arguments: <a href="#Argument%20Checking">Argument Checking</a>
+<li>checking bounds: <a href="#Features">Features</a>
+<li>checkpoint memory usage: <a href="#Extensions">Extensions</a>
+<li>clearing memory: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>common problems: <a href="#Troubleshooting">Troubleshooting</a>
+<li>compatibility: <a href="#Compatibility">Compatibility</a>
+<li>compiling the library: <a href="#Installation">Installation</a>
+<li>conf.h file: <a href="#Installation">Installation</a>
+<li>configuration file: <a href="#RC%20File">RC File</a>
+<li>configure script: <a href="#Installation">Installation</a>
+<li>configuring the library: <a href="#Installation">Installation</a>
+<li>constancy verification: <a href="#Features">Features</a>
+<li>copying: <a href="#Copying">Copying</a>
+<li>core dump: <a href="#Debug%20Tokens">Debug Tokens</a>, <a href="#Features">Features</a>
+<li>cpp: <a href="#Features">Features</a>
+<li>csh usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>current debug value: <a href="#Extensions">Extensions</a>
+<li>debug setting: <a href="#Environment%20Variable">Environment Variable</a>
+<li>debug tokens: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>debugger usage with dmalloc: <a href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<li>decimal 197: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>diagnosing errors: <a href="#General%20Errors">General Errors</a>
+<li>disabling the library: <a href="#Disabling%20the%20Library">Disabling the Library</a>
+<li>dmalloc program: <a href="#Dmalloc%20Program">Dmalloc Program</a>
+<li>dmalloc utility: <a href="#Dmalloc%20Program">Dmalloc Program</a>
+<li>dmalloc.cc file: <a href="#C++%20and%20the%20Library">C++ and the Library</a>
+<li>dmalloc.h file: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>dmalloc_address variable: <a href="#Extensions">Extensions</a>
+<li>dmalloc_address_count variable: <a href="#Extensions">Extensions</a>
+<li>dmalloc_debug function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_debug_current function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_errno number: <a href="#Extensions">Extensions</a>
+<li>dmalloc_error() routine: <a href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<li>dmalloc_examine function: <a href="#Extensions">Extensions</a>
+<li>DMALLOC_FUNC_CHECK flag: <a href="#Argument%20Checking">Argument Checking</a>
+<li>dmalloc_log_changed function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_log_heap_map function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_log_stats function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_log_unfreed function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_logpath variable: <a href="#Extensions">Extensions</a>
+<li>dmalloc_mark function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_message function: <a href="#Extensions">Extensions</a>
+<li>DMALLOC_OPTIONS: <a href="#Troubleshooting">Troubleshooting</a>, <a href="#Environment%20Variable">Environment Variable</a>
+<li>dmalloc_shutdown function: <a href="#Extensions">Extensions</a>
+<li>DMALLOC_SIZE variable: <a href="#Installation">Installation</a>
+<li>dmalloc_strerror function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_t test program: <a href="#Installation">Installation</a>
+<li>dmalloc_track function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_verify function: <a href="#Extensions">Extensions</a>
+<li>dmalloc_verify() routine: <a href="#General%20Errors">General Errors</a>
+<li>dmalloc_vmessage function: <a href="#Extensions">Extensions</a>
+<li>dmallocrc file: <a href="#RC%20File">RC File</a>
+<li>dump core: <a href="#Features">Features</a>, <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>env: <a href="#Troubleshooting">Troubleshooting</a>
+<li>environment variable: <a href="#Environment%20Variable">Environment Variable</a>
+<li>error message: <a href="#Extensions">Extensions</a>
+<li>error number: <a href="#Extensions">Extensions</a>
+<li>error-abort: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>error-dump: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>examine a pointer: <a href="#Extensions">Extensions</a>
+<li>extensions: <a href="#Extensions">Extensions</a>
+<li>faq: <a href="#Troubleshooting">Troubleshooting</a>
+<li>features: <a href="#Features">Features</a>
+<li>fence-post checking: <a href="#Features">Features</a>
+<li>fence-post errors: <a href="#Fence-Post%20Overruns">Fence-Post Overruns</a>
+<li>file/line numbers: <a href="#Features">Features</a>
+<li>force-linear: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>free: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>free-blank: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>gcc: <a href="#Portability">Portability</a>
+<li>gdb: <a href="#Return%20Address">Return Address</a>, <a href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<li>general errors: <a href="#General%20Errors">General Errors</a>
+<li>getting started: <a href="#Getting%20Started">Getting Started</a>
+<li>growing the heap: <a href="#Portability">Portability</a>
+<li>heap growing: <a href="#Portability">Portability</a>
+<li>heap map: <a href="#Extensions">Extensions</a>
+<li>heap memory: <a href="#Basic%20Definitions">Basic Definitions</a>
+<li>heap-check-map: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>help: <a href="#Troubleshooting">Troubleshooting</a>
+<li>hex 0xc5: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>how do i...: <a href="#Troubleshooting">Troubleshooting</a>
+<li>how to begin: <a href="#Getting%20Started">Getting Started</a>
+<li>ident: <a href="#Troubleshooting">Troubleshooting</a>
+<li>installing the library: <a href="#Installation">Installation</a>
+<li>internal error number: <a href="#Extensions">Extensions</a>
+<li>interval setting: <a href="#Utility%20Usage">Utility Usage</a>, <a href="#Environment%20Variable">Environment Variable</a>
+<li>introduction: <a href="#Top">Top</a>
+<li>jump start: <a href="#Getting%20Started">Getting Started</a>
+<li>ksh usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>leaking memory: <a href="#Features">Features</a>, <a href="#Memory%20Leaks">Memory Leaks</a>
+<li>leap library: <a href="#Disabling%20the%20Library">Disabling the Library</a>
+<li>leap macros: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>libdmalloclp.a library: <a href="#Disabling%20the%20Library">Disabling the Library</a>
+<li>library permissions: <a href="#Copying">Copying</a>
+<li>library utility: <a href="#Dmalloc%20Program">Dmalloc Program</a>
+<li>license: <a href="#Copying">Copying</a>
+<li>lock on: <a href="#Using%20With%20Threads">Using With Threads</a>, <a href="#Utility%20Usage">Utility Usage</a>
+<li>log a heap map: <a href="#Extensions">Extensions</a>
+<li>log memory changed: <a href="#Extensions">Extensions</a>
+<li>log statistics: <a href="#Extensions">Extensions</a>
+<li>log unfreed memory: <a href="#Extensions">Extensions</a>
+<li>log-admin: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-bad-space: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-blocks: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-current-time: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-elapsed-time: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-non-free: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-nonfree-space: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-stamp: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-stats: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-thread-id: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-trans: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>log-unknown: <a href="#Debug%20Tokens">Debug Tokens</a>, <a href="#Return%20Address">Return Address</a>, <a href="#Getting%20Started">Getting Started</a>
+<li>logfile name: <a href="#Extensions">Extensions</a>
+<li>logfile setting: <a href="#Environment%20Variable">Environment Variable</a>
+<li>logging information to disk: <a href="#Environment%20Variable">Environment Variable</a>
+<li>logging statistics: <a href="#Features">Features</a>
+<li>looking for an address: <a href="#Extensions">Extensions</a>
+<li>macros, allocation: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>macros, leap: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>making the library: <a href="#Installation">Installation</a>
+<li>malloc: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>malloc functions: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>mark memory position: <a href="#Extensions">Extensions</a>
+<li>memalign: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>memory definitions: <a href="#Basic%20Definitions">Basic Definitions</a>
+<li>memory leaks: <a href="#Memory%20Leaks">Memory Leaks</a>, <a href="#Features">Features</a>
+<li>memory position marker: <a href="#Extensions">Extensions</a>
+<li>memory problems in system functions: <a href="#Features">Features</a>
+<li>never-reuse: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>non-freed memory: <a href="#Features">Features</a>
+<li>none token: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>octal 305: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>override debug settings: <a href="#Extensions">Extensions</a>
+<li>overview: <a href="#Overview">Overview</a>
+<li>overwriting memory: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>permissions of the library: <a href="#Copying">Copying</a>
+<li>pointer information: <a href="#Extensions">Extensions</a>
+<li>pointer seen count: <a href="#Memory%20Leaks">Memory Leaks</a>
+<li>portability: <a href="#Portability">Portability</a>
+<li>print-messages: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>printenv: <a href="#Troubleshooting">Troubleshooting</a>
+<li>problems: <a href="#Troubleshooting">Troubleshooting</a>
+<li>programming: <a href="#Programming">Programming</a>
+<li>pthreads: <a href="#Using%20With%20Threads">Using With Threads</a>
+<li>questions: <a href="#Troubleshooting">Troubleshooting</a>
+<li>quick start: <a href="#Getting%20Started">Getting Started</a>
+<li>ra: <a href="#Return%20Address">Return Address</a>
+<li>rc file: <a href="#RC%20File">RC File</a>
+<li>realloc: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>realloc-copy: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>recalloc: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>return-address: <a href="#Features">Features</a>, <a href="#Portability">Portability</a>, <a href="#Return%20Address">Return Address</a>
+<li>return.h file: <a href="#Return%20Address">Return Address</a>
+<li>runtime-config file: <a href="#RC%20File">RC File</a>
+<li>sbrk: <a href="#Debug%20Tokens">Debug Tokens</a>, <a href="#Portability">Portability</a>
+<li>settings.dist file: <a href="#Installation">Installation</a>
+<li>settings.h file: <a href="#Installation">Installation</a>
+<li>sh usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>shutdown the library: <a href="#Extensions">Extensions</a>
+<li>shutdown, automatic: <a href="#Getting%20Started">Getting Started</a>
+<li>source code: <a href="#Source%20Code">Source Code</a>
+<li>source definitions: <a href="#Definitions">Definitions</a>
+<li>stack memory: <a href="#Basic%20Definitions">Basic Definitions</a>
+<li>start setting: <a href="#Environment%20Variable">Environment Variable</a>
+<li>static memory: <a href="#Basic%20Definitions">Basic Definitions</a>
+<li>statistics: <a href="#Features">Features</a>
+<li>statistics logging: <a href="#Extensions">Extensions</a>
+<li>STORE_SEEN_COUNT option: <a href="#Memory%20Leaks">Memory Leaks</a>
+<li>strdup: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>string error message: <a href="#Extensions">Extensions</a>
+<li>strings: <a href="#Troubleshooting">Troubleshooting</a>
+<li>system memory problems: <a href="#Features">Features</a>
+<li>tcsh usage: <a href="#Environment%20Variable">Environment Variable</a>
+<li>testing the library: <a href="#Installation">Installation</a>
+<li>threads: <a href="#Using%20With%20Threads">Using With Threads</a>
+<li>tokens, debug: <a href="#Debug%20Tokens">Debug Tokens</a>
+<li>track memory calls: <a href="#Extensions">Extensions</a>
+<li>tracking addresses: <a href="#Environment%20Variable">Environment Variable</a>
+<li>troubleshooting: <a href="#Troubleshooting">Troubleshooting</a>
+<li>unfreed memory: <a href="#Features">Features</a>
+<li>unfreed memory log: <a href="#Extensions">Extensions</a>
+<li>using a debugger with dmalloc: <a href="#Using%20With%20a%20Debugger">Using With a Debugger</a>
+<li>utility program: <a href="#Dmalloc%20Program">Dmalloc Program</a>
+<li>utility usage: <a href="#Utility%20Usage">Utility Usage</a>
+<li>valloc: <a href="#Allocation%20Macros">Allocation Macros</a>
+<li>verify pointers: <a href="#Extensions">Extensions</a>
+<li>verify the heap: <a href="#Extensions">Extensions</a>
+<li>where to begin: <a href="#Getting%20Started">Getting Started</a>
+<li>zeros, allocation of: <a href="#Malloc%20Functions">Malloc Functions</a>
+<li>zsh usage: <a href="#Environment%20Variable">Environment Variable</a>
+</ul>
+<h1>Table of Contents</h1>
+<ul>
+<li><a href="#Top">Debug Malloc Library</a>
+<li><a href="#Copying">1 Library Copying and Licensing Conditions</a>
+<li><a href="#Overview">2 Description of Features and How to Get Started</a>
+<ul>
+<li><a href="#Allocation%20Basics">2.1 Basic Description of Terms and Functions</a>
+<ul>
+<li><a href="#Basic%20Definitions">2.1.1 General Memory Terms and Concepts</a>
+<li><a href="#Malloc%20Functions">2.1.2 Functionality Supported by All Malloc Libraries</a>
+</ul>
+<li><a href="#Features">2.2 General Features of the Library</a>
+<li><a href="#Installation">2.3 How to Install the Library</a>
+<li><a href="#Getting%20Started">2.4 Getting Started with the Library</a>
+<li><a href="#Troubleshooting">2.5 Some Solutions to Common Problems</a>
+</ul>
+<li><a href="#Programming">3 How to Program with the Library</a>
+<ul>
+<li><a href="#Allocation%20Macros">3.1 Macros Providing File and Line Information</a>
+<li><a href="#Return%20Address">3.2 Getting Caller Address Information</a>
+<li><a href="#Argument%20Checking">3.3 Checking of Function Arguments</a>
+<li><a href="#Extensions">3.4 Additional Non-standard Routines</a>
+<li><a href="#C++%20and%20the%20Library">3.5 Using the Library with C++</a>
+<li><a href="#Disabling%20the%20Library">3.6 How to Disable the library</a>
+<li><a href="#Using%20With%20a%20Debugger">3.7 Using Dmalloc With a Debugger</a>
+<ul>
+<li><a href="#General%20Errors">3.7.1 Diagnosing General Problems with a Debugger</a>
+<li><a href="#Memory%20Leaks">3.7.2 Tracking Down Non-Freed Memory</a>
+<li><a href="#Fence-Post%20Overruns">3.7.3 Diagnosing Fence-Post Overwritten Memory</a>
+</ul>
+<li><a href="#Using%20With%20Threads">3.8 Using the Library with a Thread Package</a>
+</ul>
+<li><a href="#Dmalloc%20Program">4 Dmalloc Utility Program</a>
+<ul>
+<li><a href="#Shell%20Alias">4.1 Using a Shell Alias with the Utility</a>
+<li><a href="#Utility%20Usage">4.2 How to Use the Dmalloc Program</a>
+<li><a href="#Environment%20Variable">4.3 Environment Variable Name and Features</a>
+<li><a href="#Debug%20Tokens">4.4 Description of the Debugging Tokens</a>
+<li><a href="#RC%20File">4.5 Format of the Runtime Configuration File</a>
+</ul>
+<li><a href="#Source%20Code">5 Information on the Source Code</a>
+<ul>
+<li><a href="#Definitions">5.1 Definition of Terms and other Information</a>
+<li><a href="#Compatibility">5.2 General Compatibility Concerns</a>
+<li><a href="#Portability">5.3 Issues Important for Porting the Library</a>
+</ul>
+<li><a href="#Index%20of%20Concepts">Index of Concepts</a>
+</ul>
+
+
+</body></html>
+

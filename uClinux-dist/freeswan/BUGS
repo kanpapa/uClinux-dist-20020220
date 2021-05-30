@@ -1,0 +1,72 @@
+This code is still less than perfect and undoubtedly has bugs.  As of this
+release, the following are considered *serious* bugs: 
+
+* Transport mode with compression is broken.  The workaround is to either
+omit compression or use tunnel mode (which is preferable anyway).
+
+* There is a very obscure bug that sometimes causes Pluto to hang.  We
+have not been able to reproduce it well, and the information so far seems
+to suggest misbehavior by the Linux kernel's select() call.  It's not new,
+so if it hasn't bothered you so far, it probably won't start bothering
+you now.
+
+* If there are multiple connections specified between the same two
+security gateways, either all or none must specify compression.  Otherwise
+the result is unpredictable. 
+
+* Installing a new FreeS/WAN on top of an old one doesn't update kernel
+configuration options, so if new options are added, you need to start
+with a virgin kernel instead.
+
+* KLIPS cannot cope with IP packets employing IP options.
+
+* There are some ill-defined problems with sending large packets through
+transport-mode connections, especially in 2.2.xx kernels.
+
+* There appears to be a kernel memory leak if rekeying occurs while a
+connection is carrying traffic.  The effect is small unless you are
+rekeying very frequently indeed.
+
+* There are too many ways for packets to get around the security stuff. 
+In particular, suppose you have the following, with security gateways X
+and Y serving subnets S and T: 
+
+        S======X........Y======T
+
+A packet which shows up at Y, in clear text, claiming to be from S, with a
+destination in T, will be forwarded... even if there is an IPSEC tunnel
+between X and Y which ought to be encrypting all such packets.  The damage
+such packets could do is limited, but denial-of-service attacks are an
+obvious possibility.  Dealing with this is difficult in general, because
+we aren't quite close enough to the center of the IP processing machinery.
+KLIPS2 should fix this.
+
+* Another "packet leak" arises because at startup, shutdown, or restart,
+there is a brief period when the network is up but IPSEC is not.  This
+exposure can be reduced using the forwardcontrol parameter. 
+
+* A similar leak occurs because there is no simple way to *replace* a
+route using the Linux 2.2.xx route(8) command.  It has to be done with a
+delete/add sequence, which leaves a timing window in which there is no
+route for the destination.  (KLIPS2 should remove this problem, which is
+why we haven't sweated hard on a workaround.)
+
+* Minor difficulties can arise if more than one subnet is behind a single
+security gateway, e.g.: 
+
+        S======X.........Y======T
+                         \\
+                           ======U
+
+If U wants to talk to S encrypted, but T wants to talk to S in clear (no
+IPSEC), it actually is possible... but it has to be done with manual
+"keying", which is a little messy if the U-S connection is automatically
+keyed, because the two connections share a route but Pluto is not aware
+of this.
+
+* The number of IPSEC interfaces is hardcoded at 4 rather than being
+configurable (although at least it's not 2 any more).
+
+
+
+This file is RCSID $Id: BUGS,v 1.41 2001/06/19 05:07:59 henry Exp $

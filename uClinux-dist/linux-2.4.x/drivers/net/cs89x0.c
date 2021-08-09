@@ -186,7 +186,10 @@ static char version[] __initdata =
 #if defined(CONFIG_ALMA_ANS)
 static unsigned int netcard_portlist[] __initdata = { 0x10200300, 0 };
 #elif defined(CONFIG_UCSIMM) || defined(CONFIG_UCDIMM)
+/* patch - kanpapa
 static unsigned int netcard_portlist[] __initdata = { 0x10000300, 0 };
+*/
+static unsigned int netcard_portlist[] __initdata = { 0x2000300, 0 };
 #elif defined(CONFIG_DRAGEN2)
 static unsigned int netcard_portlist[] __initdata = { 0x08000041, 0 };
 #elif defined(CONFIG_EZ328LCD) || defined(CONFIG_VZ328LCD)
@@ -432,7 +435,8 @@ cs89x0_probe1(struct net_device *dev, int ioaddr)
 	*(volatile unsigned  char *)0xfffff42b &= ~0x02; /* input irq5 */
 	*(volatile unsigned short *)0xfffff428 &= ~0x0202; /* irq5 fcn on */
 	
-	*(volatile unsigned short *)0xfffff102 = 0x8000; /* 0x04000000 */
+/*	*(volatile unsigned short *)0xfffff102 = 0x8000; /* 0x04000000 */
+	*(volatile unsigned short *)0xfffff102 = 0x1000; /* 0x02000000 - patch kanpapa */
 	*(volatile unsigned short *)0xfffff112 = 0x01e1; /* 128k, 2ws, FLASH, en */
 #endif
 
@@ -1707,8 +1711,14 @@ static int set_mac_address(struct net_device *dev, void *addr)
 static void get_dev_addr(struct net_device *dev)
 {
 #if defined( CONFIG_UCSIMM ) || defined(CONFIG_UCDIMM)
-	extern unsigned char *cs8900a_hwaddr;
-	memcpy(dev->dev_addr, cs8900a_hwaddr, 6);
+	/* extern unsigned char *cs8900a_hwaddr; - patch kanpapa */
+	/* memcpy(dev->dev_addr, cs8900a_hwaddr, 6); - patch kanpapa */
+	dev->dev_addr[0] = 0x00;
+	dev->dev_addr[1] = 0x10;
+	dev->dev_addr[2] = 0x8b;
+	dev->dev_addr[3] = 0xf1;
+	dev->dev_addr[4] = 0xda;
+	dev->dev_addr[5] = 0x01;
 #endif
 #if defined(CONFIG_DRAGEN2)
 	extern unsigned char dragen2_cs8900_hwaddr[];
